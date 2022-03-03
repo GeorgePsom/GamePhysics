@@ -147,7 +147,7 @@ public:
      TODO
      ***************/
     COM += comVelocity * timeStep;
-    
+    orientation = orientation + 0.5 * timeStep * (orientation * angVelocity * orientation.inverse());
     for (int i = 0; i < currV.rows(); i++)
     {
         currV.row(i) << QRot(origV.row(i), orientation) + COM;
