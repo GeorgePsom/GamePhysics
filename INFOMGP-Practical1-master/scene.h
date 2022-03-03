@@ -147,8 +147,13 @@ public:
      TODO
      ***************/
     
-    for (int i=0;i<currV.rows();i++)
-      currV.row(i)<<QRot(origV.row(i), orientation)+COM;
+    
+    for (int i = 0; i < currV.rows(); i++)
+    {
+        currV.row(i) += comVelocity * timeStep;
+    }
+
+     //currV.row(i)<<QRot(origV.row(i), orientation)+COM;
   }
   
   
