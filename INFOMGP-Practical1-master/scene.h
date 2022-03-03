@@ -131,8 +131,9 @@ public:
     /***************
      TODO
      ***************/
+    Matrix3d newI = R.transpose() * invIT * R;
     
-    return Matrix3d::Identity(3,3);  //change this to your result
+    return newI;  //change this to your result
   }
   
   
@@ -175,6 +176,13 @@ public:
     /***************
      TODO
      ***************/
+
+    for (int i = 0; i < currImpulses.size(); i++)
+    {
+        comVelocity = comVelocity + currImpulses[i].second / (totalMass);
+
+        //angVelocity = angVelocity + invIT* (currImpulses[i].first-COM).cross(currImpulses[i].second);
+    }
   }
   
   RowVector3d initStaticProperties(const double density)
@@ -238,9 +246,9 @@ public:
     //integrating external forces (only gravity)
     Vector3d gravity; gravity<<0,-9.8,0.0;
     comVelocity+=gravity*timeStep;
-    angVelocity << (0.5, 0.0, 0.5);
-    Vector3d angAcceleration;  angAcceleration << 2.0, 2.0, 2.0;
-    angVelocity += timeStep * angAcceleration;
+    //angVelocity << (0.5, 0.0, 0.5);
+    //Vector3d angAcceleration;  angAcceleration << 2.0, 2.0, 2.0;
+    //angVelocity += timeStep * angAcceleration;
   }
   
   
@@ -335,14 +343,22 @@ public:
       /***************
        TODO
        ***************/
+        m2.COM = m2.COM + depth * contactNormal;
+        contactPosition = penPosition + depth * contactNormal;
     } else if (m2.isFixed){
       /***************
        TODO
        ***************/
+        m1.COM = m1.COM - depth * contactNormal;
+        contactPosition = penPosition + depth * contactNormal;
     } else { //inverse mass weighting
       /***************
        TODO
        ***************/
+        m2.COM = m2.COM + ((depth*m2.totalMass)/(m1.totalMass+m2.totalMass)) * contactNormal;
+        m1.COM = m1.COM - ((depth * m1.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
+
+        contactPosition = penPosition + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
     }
     
     
@@ -350,8 +366,30 @@ public:
     /***************
      TODO
      ***************/
+
+     // collision arm
+    RowVector3d r1 = contactPosition - m1.COM;
+    RowVector3d r2 = contactPosition - m2.COM;
+
+    // total velocity: v- = v- + w- X r
+    RowVector3d totVelocity1 = m1.comVelocity + m1.angVelocity.cross(r1);
+    RowVector3d totVelocity2 = m2.comVelocity + m2.angVelocity.cross(r2);
+
+    Matrix3d worldIn1 = m1.getCurrInvInertiaTensor();
+    Matrix3d worldIn2 = m2.getCurrInvInertiaTensor();
+
+
+    // find in world axis
+    //worldIn1 = worldIn1 + m1.totalMass * (pow(m1.COM(0,0),2)+pow(m1.COM(0,1),2)+ pow(m1.COM(0,2),2));
+
+
+    MatrixXd augMass = r1.cross(contactNormal)  * m1.invIT * r1.cross(contactNormal).transpose()+ r2.cross(contactNormal) * m2.invIT * r2.cross(contactNormal).transpose();
+
+    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(contactNormal)))) / (m1.totalMass + m2.totalMass + augMass(0,0));
     
     RowVector3d impulse=RowVector3d::Zero();  //change this to your result
+
+    impulse = j * contactNormal;
     
     std::cout<<"impulse: "<<impulse<<std::endl;
     if (impulse.norm()>10e-6){
