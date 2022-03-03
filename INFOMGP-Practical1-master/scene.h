@@ -147,7 +147,10 @@ public:
      TODO
      ***************/
     COM += comVelocity * timeStep;
-    orientation = orientation + 0.5 * timeStep * (orientation * angVelocity * orientation.inverse());
+
+    RowVector4d q(0, angVelocity.x(), angVelocity.y(), angVelocity.z());
+    //orientation += 0.5 * timeStep * QRot(orientation, q);
+    orientation += 0.5 * timeStep * QMult(orientation, q);
     for (int i = 0; i < currV.rows(); i++)
     {
         currV.row(i) << QRot(origV.row(i), orientation) + COM;
@@ -235,6 +238,9 @@ public:
     //integrating external forces (only gravity)
     Vector3d gravity; gravity<<0,-9.8,0.0;
     comVelocity+=gravity*timeStep;
+    angVelocity << (0.5, 0.0, 0.5);
+    Vector3d angAcceleration;  angAcceleration << 2.0, 2.0, 2.0;
+    angVelocity += timeStep * angAcceleration;
   }
   
   
