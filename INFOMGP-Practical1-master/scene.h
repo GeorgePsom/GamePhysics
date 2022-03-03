@@ -146,14 +146,14 @@ public:
     /***************
      TODO
      ***************/
-    
+    COM += comVelocity * timeStep;
     
     for (int i = 0; i < currV.rows(); i++)
     {
-        currV.row(i) += comVelocity * timeStep;
+        currV.row(i) << QRot(origV.row(i), orientation) + COM;
     }
 
-     //currV.row(i)<<QRot(origV.row(i), orientation)+COM;
+    
   }
   
   
