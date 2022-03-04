@@ -163,7 +163,7 @@ public:
   
   //Updating velocity *instantaneously*. i.e., not integration from acceleration, but as a result of a collision impulse from the "impulses" list
   //You need to modify this for that purpose.
-  void updateImpulseVelocities(){
+  void updateImpulseVelocities(RowVector3d angular){
     
     if (isFixed){
       comVelocity.setZero();
@@ -185,8 +185,10 @@ public:
         RowVector3d z = x.cross(y);
         RowVector3d zTranspose = z.transpose();
         int test = 0;
-        angVelocity = angVelocity + z * getCurrInvInertiaTensor();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
+        //angVelocity = angVelocity + z * getCurrInvInertiaTensor();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
         //angVelocity = angVelocity + getCurrInvInertiaTensor() * zTranspose;
+        angVelocity += (getCurrInvInertiaTensor( )* ((currImpulses[i].first - COM).cross(currImpulses[i].second)).transpose()).transpose();
+        angVelocity = angular;
     }
   }
   
@@ -339,8 +341,8 @@ public:
   void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff){
     
     
-    std::cout<<"contactNormal: "<<contactNormal<<std::endl;
-    std::cout<<"penPosition: "<<penPosition<<std::endl;
+    /*std::cout<<"contactNormal: "<<contactNormal<<std::endl;
+    std::cout<<"penPosition: "<<penPosition<<std::endl;*/
     //std::cout<<"handleCollision begin"<<std::endl;
     
     
@@ -350,8 +352,8 @@ public:
         /***************
          TODO
          ***************/
-        m2.COM = m2.COM + depth * contactNormal;
-        contactPosition = penPosition + depth * contactNormal;
+        m2.COM = m2.COM + depth * contactNormal.normalized();
+        contactPosition = penPosition + depth * contactNormal.normalized();
        /* m2.comVelocity.setZero();
         m2.angVelocity.setZero();*/
     }
@@ -359,8 +361,8 @@ public:
         /***************
          TODO
          ***************/
-        m1.COM = m1.COM - depth * contactNormal;
-        contactPosition = penPosition + depth * contactNormal;
+        m1.COM = m1.COM - depth * contactNormal.normalized();
+        contactPosition = penPosition + depth * contactNormal.normalized();
         //contactPosition = penPosition;
         /*m1.comVelocity.setZero();
         m1.angVelocity.setZero();*/
@@ -396,16 +398,53 @@ public:
     // find in world axis
     //worldIn1 = worldIn1 + m1.totalMass * (pow(m1.COM(0,0),2)+pow(m1.COM(0,1),2)+ pow(m1.COM(0,2),2));
 
+    /*std::cout << "vel 1: " << m1.comVelocity << std::endl;
+    std::cout << "vel 2: " << m2.comVelocity << std::endl;*/
 
-    MatrixXd augMass = r1.cross(contactNormal)  * worldIn1 * r1.cross(contactNormal).transpose()+ r2.cross(contactNormal) * worldIn2 * r2.cross(contactNormal).transpose();
+    double EL1 = 0.5 * m1.totalMass * m1.comVelocity.dot(m1.comVelocity);
+    double ER1 = 0.5 * m1.angVelocity * worldIn1.inverse() * m1.angVelocity.transpose();
+    double EL2 = 0.5 * m2.totalMass * m2.comVelocity.dot(m2.comVelocity);
+    double ER2 = 0.5 * m2.angVelocity * worldIn2.inverse() * m2.angVelocity.transpose();
+   /* std::cout << "Energy Linear 1: " <<EL1 << "   Rotational : " << ER1 << std::endl;
+    std::cout << "Energy Linear 2: " << EL2 << "    Rotational: " <<  ER2 << std::endl;*/
+    std::cout << "Total Energy Before:  " << EL1 + EL2 + (ER1 + ER2) << std::endl;
+    RowVector3d r1N = r1.cross(contactNormal);
+    RowVector3d r2N = r2.cross(contactNormal);
+    RowVector3d Ir1N = (worldIn1 * r1N.transpose()).transpose();
+    RowVector3d Ir2N = (worldIn2 * r2N.transpose()).transpose();
+    double augMass2 =  r2N * Ir2N.transpose();
+    double augMass1 = r1N * Ir1N.transpose();
+    double augMass  = augMass1 + augMass2;
 
-    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(contactNormal)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass(0,0));
+    /*double augMass = (r1.cross(contactNormal)).dot(worldIn1 * r1.cross(contactNormal).transpose().transpose())+
+        (r2.cross(contactNormal)).dot((worldIn2 * r2.cross(contactNormal).transpose()).transpose());*/
+
+    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(contactNormal)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass);
     
     RowVector3d impulse=RowVector3d::Zero();  //change this to your result
 
     impulse = j * contactNormal;
     
-    std::cout<<"impulse: "<<impulse<<std::endl;
+   /* std::cout << "impulse 1: " << (m1.isFixed ? RowVector3d(0, 0, 0) : (impulse / m1.totalMass)) << std::endl;
+    std::cout << "impulse 2: " << (m2.isFixed ? RowVector3d(0, 0, 0) : -(impulse / m2.totalMass)) << std::endl;*/
+
+    RowVector3d velAfter1 = m1.comVelocity + impulse / m1.totalMass;
+    RowVector3d angVelAfter1 = m1.angVelocity +  (worldIn1 * r1.cross(impulse).transpose()).transpose();
+
+    RowVector3d velAfter2 = m2.comVelocity - impulse / m2.totalMass;
+    RowVector3d angVelAfter2 = m2.angVelocity - (worldIn2 * r2.cross(impulse).transpose()).transpose();
+
+    //RowVector3d testAng(3.0, 2.0, 5.0);
+    EL1 = 0.5 * m1.totalMass * velAfter1.dot(velAfter1);
+    ER1 = 0.5 * angVelAfter1 * worldIn1.inverse() * angVelAfter1.transpose();
+    EL2 = 0.5 * m2.totalMass * velAfter2.dot(velAfter2);
+    ER2 = 0.5 * angVelAfter2 * worldIn2.inverse() * angVelAfter2.transpose();
+   /* std::cout << "Energy Linear After 1 : " << EL1<< "   Rotational After: " << ER1  << std::endl;
+    std::cout << "Energy Linear After 2: " << EL2 << "    Rotational After: " <<  ER2 << std::endl;*/
+
+    std::cout << "Total Energy After: " << (EL1 + ER1) + (EL2 + ER2) << std::endl;
+    //std::cout << "Energy Linear After 2: " << 0.5 * m2.totalMass * velAfter2.dot(velAfter2) << "    Rotational Test: " << 0.5 * testAng * worldIn1.inverse() * testAng.transpose() << std::endl;
+
     if (impulse.norm()>10e-6){
       m1.currImpulses.push_back(Impulse(contactPosition, impulse));
       m2.currImpulses.push_back(Impulse(contactPosition, -impulse));
@@ -414,8 +453,8 @@ public:
     //std::cout<<"handleCollision end"<<std::endl;
     
     //updating velocities according to impulses
-    m1.updateImpulseVelocities();
-    m2.updateImpulseVelocities();
+    m1.updateImpulseVelocities(angVelAfter1);
+    m2.updateImpulseVelocities(angVelAfter2);
   }
   
   

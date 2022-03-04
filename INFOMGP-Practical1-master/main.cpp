@@ -14,7 +14,7 @@ float currTime = 0;
 bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
-float CRCoeff= 0.5f;
+float CRCoeff= 1.0f;
 
 Scene scene;
 
