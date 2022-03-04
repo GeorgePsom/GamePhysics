@@ -151,7 +151,7 @@ public:
 
     RowVector4d q(0, angVelocity.x(), angVelocity.y(), angVelocity.z());
     //orientation += 0.5 * timeStep * QRot(orientation, q);
-    orientation += 0.5 * timeStep * QMult(orientation, q);
+    orientation += 0.5 * timeStep * QMult(q, orientation);
     for (int i = 0; i < currV.rows(); i++)
     {
         currV.row(i) << QRot(origV.row(i), orientation) + COM;
@@ -188,7 +188,7 @@ public:
         //angVelocity = angVelocity + z * getCurrInvInertiaTensor();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
         //angVelocity = angVelocity + getCurrInvInertiaTensor() * zTranspose;
         angVelocity += (getCurrInvInertiaTensor( )* ((currImpulses[i].first - COM).cross(currImpulses[i].second)).transpose()).transpose();
-        angVelocity = angular;
+        //angVelocity = angular;
     }
   }
   
@@ -353,7 +353,8 @@ public:
          TODO
          ***************/
         m2.COM = m2.COM + depth * contactNormal.normalized();
-        contactPosition = penPosition + depth * contactNormal.normalized();
+        contactPosition = penPosition - depth * contactNormal.normalized();
+
        /* m2.comVelocity.setZero();
         m2.angVelocity.setZero();*/
     }
@@ -386,6 +387,19 @@ public:
      // collision arm
     RowVector3d r1 = contactPosition - m1.COM;
     RowVector3d r2 = contactPosition - m2.COM;
+
+    double vel1 = -sqrt(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth);
+    double vel2 = -sqrt(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth);
+
+    cout << "Vel bef1: " << m1.comVelocity << "Vel bef 2: " << m2.comVelocity;
+
+    m1.comVelocity << m1.comVelocity.x(), vel1, m1.comVelocity.z();
+    m2.comVelocity << m2.comVelocity.x(), vel2, m2.comVelocity.z();
+
+    cout << "Vel aft1: " << m1.comVelocity << "Vel aft2: " << m2.comVelocity;
+
+    //m1.comVelocity = - sqrt(m1.comVelocity.y()* m1.comVelocity.y() - 2 * 9.8 * depth);
+    //m2.comVelocity.y() = - sqrt(m2.comVelocity.y()* m2.comVelocity.y() - 2 * 9.8 * depth);
 
     // total velocity: v- = v- + w- X r
     RowVector3d totVelocity1 = m1.comVelocity + m1.angVelocity.cross(r1);
