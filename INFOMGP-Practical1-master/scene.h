@@ -338,7 +338,7 @@ public:
    penPosition: a point on m2 such that if m2 <= m2 + depth*contactNormal, then penPosition+depth*contactNormal is the common contact point
    CRCoeff: the coefficient of restitution
    *********************************************************************/
-  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff){
+  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double miK){
     
     
     /*std::cout<<"contactNormal: "<<contactNormal<<std::endl;
@@ -388,15 +388,15 @@ public:
     RowVector3d r1 = contactPosition - m1.COM;
     RowVector3d r2 = contactPosition - m2.COM;
 
-    double vel1 = -sqrt(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth);
-    double vel2 = -sqrt(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth);
+    double vel1 =  (m1.comVelocity.y()  > 0 ? 1  : -1) * sqrt(abs(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth));
+    double vel2 = (m2.comVelocity.y() > 0 ? 1 : -1) * sqrt(abs(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth));
 
-    cout << "Vel bef1: " << m1.comVelocity << "Vel bef 2: " << m2.comVelocity;
+    cout << "Vel bef1: " << m1.comVelocity <<   std::endl << "Vel bef 2: " << m2.comVelocity << std::endl;
 
-    m1.comVelocity << m1.comVelocity.x(), vel1, m1.comVelocity.z();
-    m2.comVelocity << m2.comVelocity.x(), vel2, m2.comVelocity.z();
+    m1.comVelocity << m1.comVelocity.x(), m1.isFixed ? m1.comVelocity.y() : vel1, m1.comVelocity.z();
+    m2.comVelocity << m2.comVelocity.x(), m2.isFixed ? m2.comVelocity.y() : vel2, m2.comVelocity.z();
 
-    cout << "Vel aft1: " << m1.comVelocity << "Vel aft2: " << m2.comVelocity;
+    cout << "Vel aft1: " << m1.comVelocity << std::endl << "Vel aft2: " << m2.comVelocity << std::endl;
 
     //m1.comVelocity = - sqrt(m1.comVelocity.y()* m1.comVelocity.y() - 2 * 9.8 * depth);
     //m2.comVelocity.y() = - sqrt(m2.comVelocity.y()* m2.comVelocity.y() - 2 * 9.8 * depth);
@@ -408,6 +408,7 @@ public:
     Matrix3d worldIn1 = m1.getCurrInvInertiaTensor();
     Matrix3d worldIn2 = m2.getCurrInvInertiaTensor();
 
+    RowVector3d tangent = ((contactNormal.cross(m1.comVelocity - m2.comVelocity)).cross(contactNormal));
 
     // find in world axis
     //worldIn1 = worldIn1 + m1.totalMass * (pow(m1.COM(0,0),2)+pow(m1.COM(0,1),2)+ pow(m1.COM(0,2),2));
@@ -437,7 +438,7 @@ public:
     
     RowVector3d impulse=RowVector3d::Zero();  //change this to your result
 
-    impulse = j * contactNormal;
+    impulse = j * (contactNormal + miK*(tangent.normalized()));
     
    /* std::cout << "impulse 1: " << (m1.isFixed ? RowVector3d(0, 0, 0) : (impulse / m1.totalMass)) << std::endl;
     std::cout << "impulse 2: " << (m2.isFixed ? RowVector3d(0, 0, 0) : -(impulse / m2.totalMass)) << std::endl;*/
@@ -479,7 +480,7 @@ public:
    2. detecting and handling collisions with the coefficient of restitutation CRCoeff
    3. updating the visual scene in fullV and fullT
    *********************************************************************/
-  void updateScene(double timeStep, double CRCoeff){
+  void updateScene(double timeStep, double CRCoeff, double miK){
     
     //integrating velocity, position and orientation from forces and previous states
     for (int i=0;i<meshes.size();i++)
@@ -492,7 +493,7 @@ public:
     for (int i=0;i<meshes.size();i++)
       for (int j=i+1;j<meshes.size();j++)
         if (meshes[i].isCollide(meshes[j],depth, contactNormal, penPosition))
-          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff);
+          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, miK);
     
     currTime+=timeStep;
   }
