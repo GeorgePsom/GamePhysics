@@ -131,7 +131,7 @@ public:
     /***************
      TODO
      ***************/
-    Matrix3d newI = R * invIT * R.transpose();
+    Matrix3d newI = R.transpose() * invIT * R;
     
     return newI;  //change this to your result
   }
@@ -185,7 +185,8 @@ public:
         RowVector3d z = x.cross(y);
         RowVector3d zTranspose = z.transpose();
         int test = 0;
-        angVelocity = angVelocity + z  * invIT.transpose();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
+        angVelocity = angVelocity + z * getCurrInvInertiaTensor();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
+        //angVelocity = angVelocity + getCurrInvInertiaTensor() * zTranspose;
     }
   }
   
@@ -261,6 +262,8 @@ public:
   void integrate(double timeStep){
     updateVelocity(timeStep);
     updatePosition(timeStep);
+
+    currImpulses.clear();
   }
   
   
@@ -357,7 +360,8 @@ public:
          TODO
          ***************/
         m1.COM = m1.COM - depth * contactNormal;
-        contactPosition = penPosition - depth * contactNormal;
+        contactPosition = penPosition + depth * contactNormal;
+        //contactPosition = penPosition;
         /*m1.comVelocity.setZero();
         m1.angVelocity.setZero();*/
 
@@ -393,7 +397,7 @@ public:
     //worldIn1 = worldIn1 + m1.totalMass * (pow(m1.COM(0,0),2)+pow(m1.COM(0,1),2)+ pow(m1.COM(0,2),2));
 
 
-    MatrixXd augMass = r1.cross(contactNormal)  * worldIn1 * r1.cross(contactNormal).transpose()+ r2.cross(contactNormal) * worldIn1 * r2.cross(contactNormal).transpose();
+    MatrixXd augMass = r1.cross(contactNormal)  * worldIn1 * r1.cross(contactNormal).transpose()+ r2.cross(contactNormal) * worldIn2 * r2.cross(contactNormal).transpose();
 
     double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(contactNormal)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass(0,0));
     
