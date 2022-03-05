@@ -126,14 +126,19 @@ public:
   
   //return the current inverted inertia tensor around the current COM. Update it by applying the orientation
   Matrix3d getCurrInvInertiaTensor(){
-    Matrix3d R=Q2RotMatrix(orientation);
+    
+     Matrix3d R=Q2RotMatrix(orientation);
+     //Matrix3d R = Q2RotMatrix(orientation);
+
+     
     
     /***************
      TODO
      ***************/
-    Matrix3d newI = R.transpose() * invIT * R;
+    //Matrix3d newI = R.transpose() * invIT * R;
     
-    return newI;  //change this to your result
+    //return newI;  //change this to your result
+    return invIT;
   }
   
   
@@ -149,9 +154,21 @@ public:
      ***************/
     COM += comVelocity * timeStep;
 
-    RowVector4d q(0, angVelocity.x(), angVelocity.y(), angVelocity.z());
+    RowVector3d normAng = angVelocity.normalized();
+
+    //std::cout << "Angular: " << angVelocity << std::endl;
+    //std::cout << "Norm angular: " << normAng << std::endl;
+
+    RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
     //orientation += 0.5 * timeStep * QRot(orientation, q);
+    //orientation += 0.5 * timeStep * QMult(q.normalized(), orientation.normalized());
+
     orientation += 0.5 * timeStep * QMult(q, orientation);
+
+    //std::cout << "Orientation: " << orientation << std::endl;
+
+    //orientation.normalize();
+    
     for (int i = 0; i < currV.rows(); i++)
     {
         currV.row(i) << QRot(origV.row(i), orientation) + COM;
@@ -187,7 +204,7 @@ public:
         int test = 0;
         //angVelocity = angVelocity + z * getCurrInvInertiaTensor();//* ((currImpulses[i].first-COM).cross(currImpulses[i].second)).transpose();
         //angVelocity = angVelocity + getCurrInvInertiaTensor() * zTranspose;
-        angVelocity += (getCurrInvInertiaTensor( )* ((currImpulses[i].first - COM).cross(currImpulses[i].second)).transpose()).transpose();
+        angVelocity += (getCurrInvInertiaTensor()* ((currImpulses[i].first - COM).cross(currImpulses[i].second)).transpose()).transpose();
         //angVelocity = angular;
     }
   }
@@ -341,8 +358,8 @@ public:
   void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double miK){
     
     
-    /*std::cout<<"contactNormal: "<<contactNormal<<std::endl;
-    std::cout<<"penPosition: "<<penPosition<<std::endl;*/
+    std::cout<<"contactNormal: "<<contactNormal<<std::endl;
+    std::cout<<"penPosition: "<<penPosition<<std::endl;
     //std::cout<<"handleCollision begin"<<std::endl;
     
     
@@ -353,7 +370,7 @@ public:
          TODO
          ***************/
         m2.COM = m2.COM + depth * contactNormal.normalized();
-        contactPosition = penPosition - depth * contactNormal.normalized();
+        contactPosition = penPosition + depth * contactNormal.normalized();
 
        /* m2.comVelocity.setZero();
         m2.angVelocity.setZero();*/
@@ -388,6 +405,8 @@ public:
     RowVector3d r1 = contactPosition - m1.COM;
     RowVector3d r2 = contactPosition - m2.COM;
 
+    std::cout << "collision arm: " << r2 << std::endl;
+
     double vel1 =  (m1.comVelocity.y()  > 0 ? 1  : -1) * sqrt(abs(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth));
     double vel2 = (m2.comVelocity.y() > 0 ? 1 : -1) * sqrt(abs(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth));
 
@@ -410,11 +429,18 @@ public:
 
     RowVector3d tangent = ((contactNormal.cross(m1.comVelocity - m2.comVelocity)).cross(contactNormal));
 
+    //std::cout << "Tangent: " << tangent.normalized() << std::endl;
+
     // find in world axis
     //worldIn1 = worldIn1 + m1.totalMass * (pow(m1.COM(0,0),2)+pow(m1.COM(0,1),2)+ pow(m1.COM(0,2),2));
 
     /*std::cout << "vel 1: " << m1.comVelocity << std::endl;
     std::cout << "vel 2: " << m2.comVelocity << std::endl;*/
+
+    //RowVector3d updN = (contactNormal + miK * (tangent.normalized())).normalized();
+    RowVector3d updN = (contactNormal + miK * (tangent.normalized())).normalized();
+
+    //updN = contactNormal;
 
     double EL1 = 0.5 * m1.totalMass * m1.comVelocity.dot(m1.comVelocity);
     double ER1 = 0.5 * m1.angVelocity * worldIn1.inverse() * m1.angVelocity.transpose();
@@ -423,8 +449,8 @@ public:
    /* std::cout << "Energy Linear 1: " <<EL1 << "   Rotational : " << ER1 << std::endl;
     std::cout << "Energy Linear 2: " << EL2 << "    Rotational: " <<  ER2 << std::endl;*/
     std::cout << "Total Energy Before:  " << EL1 + EL2 + (ER1 + ER2) << std::endl;
-    RowVector3d r1N = r1.cross(contactNormal);
-    RowVector3d r2N = r2.cross(contactNormal);
+    RowVector3d r1N = r1.cross(updN);
+    RowVector3d r2N = r2.cross(updN);
     RowVector3d Ir1N = (worldIn1 * r1N.transpose()).transpose();
     RowVector3d Ir2N = (worldIn2 * r2N.transpose()).transpose();
     double augMass2 =  r2N * Ir2N.transpose();
@@ -434,11 +460,15 @@ public:
     /*double augMass = (r1.cross(contactNormal)).dot(worldIn1 * r1.cross(contactNormal).transpose().transpose())+
         (r2.cross(contactNormal)).dot((worldIn2 * r2.cross(contactNormal).transpose()).transpose());*/
 
-    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(contactNormal)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass);
+    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(updN)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass);
     
     RowVector3d impulse=RowVector3d::Zero();  //change this to your result
 
-    impulse = j * (contactNormal + miK*(tangent.normalized()));
+    //impulse = j * (contactNormal + miK*(tangent.normalized()));
+
+    impulse = j * updN;
+
+    //impulse = j * (contactNormal);
     
    /* std::cout << "impulse 1: " << (m1.isFixed ? RowVector3d(0, 0, 0) : (impulse / m1.totalMass)) << std::endl;
     std::cout << "impulse 2: " << (m2.isFixed ? RowVector3d(0, 0, 0) : -(impulse / m2.totalMass)) << std::endl;*/
