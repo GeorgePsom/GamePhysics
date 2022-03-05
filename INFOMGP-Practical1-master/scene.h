@@ -135,7 +135,7 @@ public:
     /***************
      TODO
      ***************/
-    //Matrix3d newI = R.transpose() * invIT * R;
+    Matrix3d newI = R.transpose() * invIT * R;
     
     //return newI;  //change this to your result
     return invIT;
@@ -446,9 +446,13 @@ public:
     double ER1 = 0.5 * m1.angVelocity * worldIn1.inverse() * m1.angVelocity.transpose();
     double EL2 = 0.5 * m2.totalMass * m2.comVelocity.dot(m2.comVelocity);
     double ER2 = 0.5 * m2.angVelocity * worldIn2.inverse() * m2.angVelocity.transpose();
+    double D1 = m1.totalMass * 9.8 * m1.COM.y();
+    double D2 = m2.totalMass * 9.8 * m2.COM.y();
+    std::cout << "COM2: " << m2.COM.y() << std::endl;
+    std::cout << "Grav energy: " << D2 << std::endl;
    /* std::cout << "Energy Linear 1: " <<EL1 << "   Rotational : " << ER1 << std::endl;
     std::cout << "Energy Linear 2: " << EL2 << "    Rotational: " <<  ER2 << std::endl;*/
-    std::cout << "Total Energy Before:  " << EL1 + EL2 + (ER1 + ER2) << std::endl;
+    std::cout << "Total Energy Before:  " << EL1 + EL2 + (ER1 + ER2) + (D2) << std::endl;
     RowVector3d r1N = r1.cross(updN);
     RowVector3d r2N = r2.cross(updN);
     RowVector3d Ir1N = (worldIn1 * r1N.transpose()).transpose();
@@ -484,10 +488,12 @@ public:
     ER1 = 0.5 * angVelAfter1 * worldIn1.inverse() * angVelAfter1.transpose();
     EL2 = 0.5 * m2.totalMass * velAfter2.dot(velAfter2);
     ER2 = 0.5 * angVelAfter2 * worldIn2.inverse() * angVelAfter2.transpose();
+    D1 = m1.totalMass * 9.8 * m1.COM.y();
+    D2 = m2.totalMass * 9.8 * m2.COM.y();
    /* std::cout << "Energy Linear After 1 : " << EL1<< "   Rotational After: " << ER1  << std::endl;
     std::cout << "Energy Linear After 2: " << EL2 << "    Rotational After: " <<  ER2 << std::endl;*/
 
-    std::cout << "Total Energy After: " << (EL1 + ER1) + (EL2 + ER2) << std::endl;
+    std::cout << "Total Energy After: " << (EL1 + ER1) + (EL2 + ER2) + (D2) << std::endl;
     //std::cout << "Energy Linear After 2: " << 0.5 * m2.totalMass * velAfter2.dot(velAfter2) << "    Rotational Test: " << 0.5 * testAng * worldIn1.inverse() * testAng.transpose() << std::endl;
 
     if (impulse.norm()>10e-6){
