@@ -196,7 +196,7 @@ public:
 
     for (int i = 0; i < currImpulses.size(); i++)
     {
-         comVelocity = comVelocity + currImpulses[i].second / (totalMass);
+        comVelocity = comVelocity + currImpulses[i].second / (totalMass);
         RowVector3d x = currImpulses[i].first - COM;
         RowVector3d y = currImpulses[i].second;
         RowVector3d z = x.cross(y);
@@ -262,24 +262,24 @@ public:
   
   //Integrating the linear and angular velocities of the object
   //You need to modify this to integrate from acceleration in the field (basically gravity)
-  void updateVelocity(double timeStep){
+  void updateVelocity(double timeStep, double dragCoeff){
     
     if (isFixed)
       return;
     
     //integrating external forces (only gravity)
     Vector3d gravity; gravity<<0,-9.8,0.0;
-    comVelocity+=gravity*timeStep;
-    //angVelocity << (0.5, 0.0, 0.5);
-    //Vector3d angAcceleration;  angAcceleration << 2.0, 2.0, 2.0;
-    //angVelocity += timeStep * angAcceleration;
+    comVelocity += (gravity * timeStep);
+    comVelocity -= comVelocity * dragCoeff * timeStep / totalMass;
+    angVelocity -=  (invIT * angVelocity.transpose() * timeStep *  dragCoeff).transpose();
+    
   }
   
   
   //the full integration for the time step (velocity + position)
   //You need to modify this if you are changing the integration
-  void integrate(double timeStep){
-    updateVelocity(timeStep);
+  void integrate(double timeStep, double dragCoeff){
+    updateVelocity(timeStep, dragCoeff);
     updatePosition(timeStep);
 
     currImpulses.clear();
@@ -355,7 +355,7 @@ public:
    penPosition: a point on m2 such that if m2 <= m2 + depth*contactNormal, then penPosition+depth*contactNormal is the common contact point
    CRCoeff: the coefficient of restitution
    *********************************************************************/
-  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double miK){
+  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double miK, const double dragCoeff){
     
     
     std::cout<<"contactNormal: "<<contactNormal<<std::endl;
@@ -492,7 +492,7 @@ public:
     D2 = m2.totalMass * 9.8 * m2.COM.y();
    /* std::cout << "Energy Linear After 1 : " << EL1<< "   Rotational After: " << ER1  << std::endl;
     std::cout << "Energy Linear After 2: " << EL2 << "    Rotational After: " <<  ER2 << std::endl;*/
-
+    std::cout << "Ratio: " << (EL1 + ER1) / (EL2 + ER2 + EL1 + ER1) << std::endl;
     std::cout << "Total Energy After: " << (EL1 + ER1) + (EL2 + ER2) + (D2) << std::endl;
     //std::cout << "Energy Linear After 2: " << 0.5 * m2.totalMass * velAfter2.dot(velAfter2) << "    Rotational Test: " << 0.5 * testAng * worldIn1.inverse() * testAng.transpose() << std::endl;
 
@@ -516,11 +516,11 @@ public:
    2. detecting and handling collisions with the coefficient of restitutation CRCoeff
    3. updating the visual scene in fullV and fullT
    *********************************************************************/
-  void updateScene(double timeStep, double CRCoeff, double miK){
+  void updateScene(double timeStep, double CRCoeff, double miK, double dragCoeff){
     
     //integrating velocity, position and orientation from forces and previous states
     for (int i=0;i<meshes.size();i++)
-      meshes[i].integrate(timeStep);
+      meshes[i].integrate(timeStep, dragCoeff);
     
     //detecting and handling collisions when found
     //This is done exhaustively: checking every two objects in the scene.
@@ -529,7 +529,7 @@ public:
     for (int i=0;i<meshes.size();i++)
       for (int j=i+1;j<meshes.size();j++)
         if (meshes[i].isCollide(meshes[j],depth, contactNormal, penPosition))
-          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, miK);
+          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, miK, dragCoeff);
     
     currTime+=timeStep;
   }

@@ -15,6 +15,7 @@ bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
 float CRCoeff= 0.99f;
+float DragCoeff = 100000.0f;
 float miK = 0.0f;
 
 Scene scene;
@@ -97,7 +98,7 @@ bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier
   if (key == 'S')
   {
     if (!viewer.core().is_animating){
-      scene.updateScene(timeStep, CRCoeff, miK);
+      scene.updateScene(timeStep, CRCoeff, miK, DragCoeff);
       currTime+=timeStep;
       updateMeshes(viewer);
       std::cout <<"currTime: "<<currTime<<std::endl;
@@ -117,7 +118,7 @@ bool pre_draw(igl::opengl::glfw::Viewer &viewer)
   
   if (viewer.core().is_animating){
     if (!animationHack)
-      scene.updateScene(timeStep, CRCoeff, miK);
+      scene.updateScene(timeStep, CRCoeff, miK, DragCoeff);
     else
       viewer.core().is_animating=false;
     animationHack=false;
@@ -142,6 +143,7 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
     {
       ImGui::InputFloat("CR Coeff", &CRCoeff, 0, 0, "%.2f");
       ImGui::InputFloat("Friction Coeff", &miK, 0, 0, "%.2f");
+      ImGui::InputFloat("Drag Coeff", &DragCoeff, 0, 0, "%.2f");
 
       if (ImGui::InputFloat("Time Step", &timeStep)) {
         mgpViewer.core().animation_max_fps = (((int)1.0/timeStep));
@@ -171,7 +173,7 @@ int main(int argc, char *argv[])
   //load scene from file
   scene.loadScene(std::string(argv[1]),std::string(argv[2]));
 
-  scene.updateScene(0.0, CRCoeff, miK);
+  scene.updateScene(0.0, CRCoeff, miK, DragCoeff);
   
   // Viewer Settings
   for (int i=0;i<scene.meshes.size();i++){
