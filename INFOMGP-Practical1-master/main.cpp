@@ -15,8 +15,8 @@ bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
 float CRCoeff= 0.99f;
-float DragCoeff = 100000.0f;
-float miK = 0.0f;
+float DragCoeff = 0.0f;
+float miK = 0.8f;
 
 Scene scene;
 

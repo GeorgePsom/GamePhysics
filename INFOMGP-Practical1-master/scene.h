@@ -429,6 +429,8 @@ public:
 
     RowVector3d tangent = ((contactNormal.cross(m1.comVelocity - m2.comVelocity)).cross(contactNormal));
 
+    //RowVector3d tangent = ((contactNormal.cross(totVelocity1 - totVelocity2)).cross(contactNormal));
+
     //std::cout << "Tangent: " << tangent.normalized() << std::endl;
 
     // find in world axis
