@@ -342,6 +342,9 @@ public:
      update m(1,2) comVelocity, angVelocity and COM variables by using a Constraint class of type COLLISION
      ***********************/
     
+    Constraint collisionConstraint(COLLISION, INEQUALITY, 0, 0, 0, 0, invMass1, invMass2, contactNormal, 0.0, CRCoeff);
+    collisionConstraint.resolveVelocityConstraint();
+    collisionConstraint.resolvePositionConstraint();
   }
   
   /*********************************************************************
@@ -376,7 +379,7 @@ public:
     
     //Resolving velocity
     int currIteration=0;
-    int zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.
+    int zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.currVertexPositions
     int currConstIndex=0;
     while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
       
