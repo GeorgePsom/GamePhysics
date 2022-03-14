@@ -126,7 +126,19 @@ public:
   Matrix3d getCurrInvInertiaTensor(){
    /********
     TODO: complete from Practical 1
+
     *******/
+
+      Matrix3d R = Q2RotMatrix(orientation);
+
+
+
+      /***************
+       TODO
+       ***************/
+      Matrix3d newI = R.transpose() * invIT * R;
+
+      return newI;
   }
   
   
@@ -141,8 +153,22 @@ public:
      TODO: complete from Practical 1
      *******/
     
-    for (int i=0;i<currV.rows();i++)
-      currV.row(i)<<QRot(origV.row(i), orientation)+COM;
+    COM += comVelocity * timeStep;
+
+    RowVector3d normAng = angVelocity.normalized();
+
+    //std::cout << "Angular: " << angVelocity << std::endl;
+    //std::cout << "Norm angular: " << normAng << std::endl;
+
+    RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
+
+    orientation += 0.5 * timeStep * QMult(q, orientation);
+
+    for (int i = 0; i < currV.rows(); i++)
+    {
+        currV.row(i) << QRot(origV.row(i), orientation) + COM;
+    }
+
   }
   
   
@@ -209,6 +235,11 @@ public:
     /********
      TODO: complete from Practical 1
      *******/
+
+    Vector3d gravity; gravity << 0, -9.8, 0.0;
+    comVelocity += (gravity * timeStep);
+    //comVelocity -= comVelocity * dragCoeff * timeStep;
+    //angVelocity -= (angVelocity * timeStep * dragCoeff);
   }
   
   
