@@ -4,6 +4,7 @@
 #include <igl/opengl/glfw/imgui/ImGuiHelpers.h>
 #include <iostream>
 #include "scene.h"
+#include "line_cylinders.h"
 
 
 Eigen::MatrixXd V;
@@ -14,9 +15,11 @@ float currTime = 0;
 bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
-float CRCoeff= 0.99f;
-float DragCoeff = 0.0f;
-float miK = 0.4f;
+float CRCoeff= 1.0;
+
+
+double tolerance = 10e-3;
+int maxIterations=10000;
 
 Scene scene;
 
@@ -66,7 +69,7 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
 {
   RowVector3d platColor; platColor<<0.8,0.8,0.8;
   RowVector3d meshColor; meshColor<<0.8,0.2,0.2;
-  
+  viewer.core().align_camera_center(scene.meshes[0].currV);
   for (int i=0;i<scene.meshes.size();i++){
     viewer.data_list[i].clear();
     viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
@@ -77,11 +80,30 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
   viewer.data_list[0].show_lines=false;
   viewer.data_list[0].set_colors(platColor.replicate(scene.meshes[0].F.rows(),1));
   viewer.data_list[0].set_face_based(true);
+  //viewer.core.align_camera_center(scene.meshes[0].currV);
   
-  viewer.core().align_camera_center(scene.meshes[0].currV);
+  //updating constraint viewing
+  MatrixXi constF;
+  MatrixXd constV, constC;
+  
+  MatrixXd P1(scene.constraints.size(),3);
+  MatrixXd P2(scene.constraints.size(),3);
+  for (int i=0;i<scene.constraints.size();i++){
+    P1.row(i)=scene.meshes[scene.constraints[i].m1].currV.row(scene.constraints[i].v1);
+    P2.row(i)=scene.meshes[scene.constraints[i].m2].currV.row(scene.constraints[i].v2);
+  }
+  
+  MatrixXd cyndColors=RowVector3d(1.0,1.0,0.0).replicate(P1.size(),1);
+  
+  double radius = 0.5;
+  hedra::line_cylinders(P1,P2,radius,cyndColors,8,constV,constF,constC);
+  viewer.data_list[scene.meshes.size()].set_mesh(constV, constF);
+  viewer.data_list[scene.meshes.size()].set_face_based(true);
+  viewer.data_list[scene.meshes.size()].set_colors(constC);
+  viewer.data_list[scene.meshes.size()].show_lines=false;
+  
+  
 }
-
-
 
 bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier)
 {
@@ -98,7 +120,7 @@ bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier
   if (key == 'S')
   {
     if (!viewer.core().is_animating){
-      scene.updateScene(timeStep, CRCoeff, miK, DragCoeff);
+      scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations);
       currTime+=timeStep;
       updateMeshes(viewer);
       std::cout <<"currTime: "<<currTime<<std::endl;
@@ -118,11 +140,12 @@ bool pre_draw(igl::opengl::glfw::Viewer &viewer)
   
   if (viewer.core().is_animating){
     if (!animationHack)
-      scene.updateScene(timeStep, CRCoeff, miK, DragCoeff);
+      scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations);
     else
       viewer.core().is_animating=false;
     animationHack=false;
     currTime+=timeStep;
+    //cout <<"currTime: "<<currTime<<endl;
     updateMeshes(viewer);
   }
  
@@ -141,10 +164,9 @@ class CustomMenu : public igl::opengl::glfw::imgui::ImGuiMenu
     // Add new group
     if (ImGui::CollapsingHeader("Algorithm Options", ImGuiTreeNodeFlags_DefaultOpen))
     {
-      ImGui::InputFloat("CR Coeff", &CRCoeff, 0, 0, "%.2f");
-      ImGui::InputFloat("Friction Coeff", &miK, 0, 0, "%.2f");
-      ImGui::InputFloat("Drag Coeff", &DragCoeff, 0, 0, "%.2f");
-
+      ImGui::InputFloat("CR Coeff",&CRCoeff,0,0,"%.2f");
+      
+      
       if (ImGui::InputFloat("Time Step", &timeStep)) {
         mgpViewer.core().animation_max_fps = (((int)1.0/timeStep));
       }
@@ -161,8 +183,8 @@ int main(int argc, char *argv[])
   
   
   // Load scene
-  if (argc<3){
-    cout<<"Please provide path (argument 1 and name of scene file (argument 2)!"<<endl;
+  if (argc<4){
+    cout<<"Please provide path (argument 1), name of scene file (argument 2), and name of constraints file (argument 3)!"<<endl;
     return 0;
   }
   cout<<"scene file: "<<std::string(argv[2])<<endl;
@@ -171,9 +193,9 @@ int main(int argc, char *argv[])
   scene.addMesh(platV, platF, platT, 10000.0, true, platCOM, platOrientation);
   
   //load scene from file
-  scene.loadScene(std::string(argv[1]),std::string(argv[2]));
+  scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]));
 
-  scene.updateScene(0.0, CRCoeff, miK, DragCoeff);
+  scene.updateScene(0.0, CRCoeff, tolerance, maxIterations);
   
   // Viewer Settings
   for (int i=0;i<scene.meshes.size();i++){
@@ -183,13 +205,14 @@ int main(int argc, char *argv[])
   }
   //mgpViewer.core.align_camera_center(scene.meshes[0].currV);
   
-  
+  //constraints mesh (for lines)
+  mgpViewer.append_mesh();
   mgpViewer.callback_pre_draw = &pre_draw;
   mgpViewer.callback_key_down = &key_down;
   mgpViewer.core().is_animating = true;
   animationHack = true;
   mgpViewer.core().animation_max_fps = 50.;
-
+  
   CustomMenu menu;
   igl::opengl::glfw::imgui::ImGuiPlugin plugin;
   mgpViewer.plugins.push_back(&plugin);
@@ -197,7 +220,8 @@ int main(int argc, char *argv[])
   
   cout<<"Press [space] to toggle continuous simulation" << endl;
   cout<<"Press 'S' to advance time step-by-step"<<endl;
+  
   updateMeshes(mgpViewer);
   mgpViewer.launch();
-  
+ 
 }

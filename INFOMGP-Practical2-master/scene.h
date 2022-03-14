@@ -8,6 +8,7 @@
 #include "ccd.h"
 #include "volInt.h"
 #include "auxfunctions.h"
+#include "constraints.h"
 
 using namespace Eigen;
 using namespace std;
@@ -47,10 +48,7 @@ public:
   double totalVolume;
   RowVector3d comVelocity;  //the linear velocity of the center of mass
   RowVector3d angVelocity;  //the angular velocity of the object.
-  
-  //dynamics
-  std::vector<Impulse> currImpulses;  //current list of impulses, updated by collision handling
-  
+
   //checking collision between bounding boxes, and consequently the boundary tets if succeeds.
   //you do not need to update these functions (isBoxCollide and isCollide) unless you are doing a different collision
   
@@ -126,17 +124,9 @@ public:
   
   //return the current inverted inertia tensor around the current COM. Update it by applying the orientation
   Matrix3d getCurrInvInertiaTensor(){
-    
-     Matrix3d R=Q2RotMatrix(orientation);
-
-     
-    
-    /***************
-     TODO
-     ***************/
-    Matrix3d newI = R.transpose() * invIT * R;
-
-    return newI;
+   /********
+    TODO: complete from Practical 1
+    *******/
   }
   
   
@@ -147,52 +137,14 @@ public:
     if (isFixed)
       return;  //a fixed object is immobile
     
-    /***************
-     TODO
-     ***************/
-    COM += comVelocity * timeStep;
-
-    RowVector3d normAng = angVelocity.normalized();
-
-    //std::cout << "Angular: " << angVelocity << std::endl;
-    //std::cout << "Norm angular: " << normAng << std::endl;
-
-    RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
-
-    orientation += 0.5 * timeStep * QMult(q, orientation);
+    /********
+     TODO: complete from Practical 1
+     *******/
     
-    for (int i = 0; i < currV.rows(); i++)
-    {
-        currV.row(i) << QRot(origV.row(i), orientation) + COM;
-    }
-
-    
+    for (int i=0;i<currV.rows();i++)
+      currV.row(i)<<QRot(origV.row(i), orientation)+COM;
   }
   
-  
-  //Updating velocity *instantaneously*. i.e., not integration from acceleration, but as a result of a collision impulse from the "impulses" list
-  //You need to modify this for that purpose.
-  void updateImpulseVelocities(RowVector3d angular){
-    
-    if (isFixed){
-      comVelocity.setZero();
-      currImpulses.clear();
-      angVelocity.setZero();
-      return;
-    }
-    
-    //update linear and angular velocity according to all impulses
-    /***************
-     TODO
-     ***************/
-
-    for (int i = 0; i < currImpulses.size(); i++)
-    {
-        comVelocity = comVelocity + currImpulses[i].second / (totalMass);
-
-        angVelocity += (getCurrInvInertiaTensor()* ((currImpulses[i].first - COM).cross(currImpulses[i].second)).transpose()).transpose();
-    }
-  }
   
   RowVector3d initStaticProperties(const double density)
   {
@@ -239,35 +191,32 @@ public:
       
     }
     invIT=IT.inverse();
+    if (isFixed)
+      invIT.setZero();  //infinite resistance to rotation
   
     return naturalCOM;
     
   }
   
   
-  //Integrating the linear and angular velocities of the object
+  //Updating the linear and angular velocities of the object
   //You need to modify this to integrate from acceleration in the field (basically gravity)
-  void updateVelocity(double timeStep, double dragCoeff){
+  void updateVelocity(double timeStep){
     
     if (isFixed)
       return;
     
-    //integrating external forces (only gravity)
-    Vector3d gravity; gravity<<0,-9.8,0.0;
-    comVelocity += (gravity * timeStep);
-    comVelocity -= comVelocity * dragCoeff * timeStep ;
-    angVelocity -=  ( angVelocity * timeStep *  dragCoeff);
-    
+    /********
+     TODO: complete from Practical 1
+     *******/
   }
   
   
   //the full integration for the time step (velocity + position)
   //You need to modify this if you are changing the integration
-  void integrate(double timeStep, double dragCoeff){
-    updateVelocity(timeStep, dragCoeff);
+  void integrate(double timeStep){
+    updateVelocity(timeStep);
     updatePosition(timeStep);
-
-    currImpulses.clear();
   }
   
   
@@ -325,6 +274,9 @@ public:
   int numFullV, numFullT;
   std::vector<Mesh> meshes;
   
+  //Practical 2
+  vector<Constraint> constraints;   //The (user) constraints of the scene
+  
   //adding an objects. You do not need to update this generally
   void addMesh(const MatrixXd& V, const MatrixXi& F, const MatrixXi& T, const double density, const bool isFixed, const RowVector3d& COM, const RowVector4d& orientation){
     
@@ -332,155 +284,50 @@ public:
     meshes.push_back(m);
   }
   
+  
+  
   /*********************************************************************
-   This function handles a collision between objects ro1 and ro2 when found, by assigning impulses to both objects.
-   Input: RigidObjects m1, m2
+   This function handles collision constraints between objects m1 and m2 when found
+   Input: meshes m1, m2
    depth: the depth of penetration
    contactNormal: the normal of the conact measured m1->m2
    penPosition: a point on m2 such that if m2 <= m2 + depth*contactNormal, then penPosition+depth*contactNormal is the common contact point
    CRCoeff: the coefficient of restitution
+   
+   You should create a "Constraint" class, and use its resolveVelocityConstraint() and resolvePositionConstraint() *alone* to resolve the constraint.
+   You are not allowed to use practical 1 collision handling
    *********************************************************************/
-  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double miK, const double dragCoeff){
+  void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double tolerance){
     
     
-  //  std::cout<<"contactNormal: "<<contactNormal<<std::endl;
-   // std::cout<<"penPosition: "<<penPosition<<std::endl;
-    //std::cout<<"handleCollision begin"<<std::endl;
+    //std::cout<<"contactNormal: "<<contactNormal<<std::endl;
+    //std::cout<<"penPosition: "<<penPosition<<std::endl;
     
-    
-    //Interpretation resolution: move each object by inverse mass weighting, unless either is fixed, and then move the other. Remember to respect the direction of contactNormal and update penPosition accordingly.
-    RowVector3d contactPosition;
-    if (m1.isFixed) {
-        /***************
-         TODO
-         ***************/
-        m2.COM = m2.COM + depth * contactNormal.normalized();
-        contactPosition = penPosition + depth * contactNormal.normalized();
-    }
-    else if (m2.isFixed) {
-        /***************
-         TODO
-         ***************/
-        m1.COM = m1.COM - depth * contactNormal.normalized();
-        contactPosition = penPosition + depth * contactNormal.normalized();
-
-    } else { //inverse mass weighting
-      /***************
-       TODO
-       ***************/
-        m2.COM = m2.COM + ((depth*m2.totalMass)/(m1.totalMass+m2.totalMass)) * contactNormal;
-        m1.COM = m1.COM - ((depth * m1.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
-
-        contactPosition = penPosition + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
-    }
-    
-    
-    //Create impulse and push them into m1.impulses and m2.impulses.
+    double invMass1 = (m1.isFixed ? 0.0 : 1.0/m1.totalMass);  //fixed meshes have infinite mass
+    double invMass2 = (m2.isFixed ? 0.0 : 1.0/m2.totalMass);
+  
     /***************
-     TODO
-     ***************/
-
-     // collision arm
-    RowVector3d r1 = contactPosition - m1.COM;
-    RowVector3d r2 = contactPosition - m2.COM;
-
-   // std::cout << "collision arm: " << r2 << std::endl;
-
-    double vel1 =  (m1.comVelocity.y()  > 0 ? 1  : -1) * sqrt(abs(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth));
-    double vel2 = (m2.comVelocity.y() > 0 ? 1 : -1) * sqrt(abs(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth));
-
-   // cout << "Vel bef1: " << m1.comVelocity <<   std::endl << "Vel bef 2: " << m2.comVelocity << std::endl;
-
-    // velocity correction
-    m1.comVelocity << m1.comVelocity.x(), m1.isFixed ? m1.comVelocity.y() : vel1, m1.comVelocity.z();
-    m2.comVelocity << m2.comVelocity.x(), m2.isFixed ? m2.comVelocity.y() : vel2, m2.comVelocity.z();
-
-  //  cout << "Vel aft1: " << m1.comVelocity << std::endl << "Vel aft2: " << m2.comVelocity << std::endl;
-
-    // total velocity: v- = v- + w- X r
-    RowVector3d totVelocity1 = m1.comVelocity + m1.angVelocity.cross(r1);
-    RowVector3d totVelocity2 = m2.comVelocity + m2.angVelocity.cross(r2);
-
-    Matrix3d worldIn1 = m1.getCurrInvInertiaTensor();
-    Matrix3d worldIn2 = m2.getCurrInvInertiaTensor();
-
-    RowVector3d tangent = ((contactNormal.cross(totVelocity1 - totVelocity2)).cross(contactNormal)).normalized();
-
-    //RowVector3d tangent = ((contactNormal.cross(totVelocity1 - totVelocity2)).cross(contactNormal));
-
-    //std::cout << "Tangent: " << tangent.normalized() << std::endl;
-
-
-    RowVector3d updN = (contactNormal - miK * (tangent));
-
-    double EL1 = 0.5 * m1.totalMass * m1.comVelocity.dot(m1.comVelocity);
-    double ER1 = 0.5 * m1.angVelocity * worldIn1.inverse() * m1.angVelocity.transpose();
-    double EL2 = 0.5 * m2.totalMass * m2.comVelocity.dot(m2.comVelocity);
-    double ER2 = 0.5 * m2.angVelocity * worldIn2.inverse() * m2.angVelocity.transpose();
-    double D1 = m1.totalMass * 9.8 * m1.COM.y();
-    double D2 = m2.totalMass * 9.8 * m2.COM.y();
-    //std::cout << "COM2: " << m2.COM.y() << std::endl;
-   // std::cout << "Grav energy: " << D2 << std::endl;
-
-    //std::cout << "Total Energy Before:  " << EL1 + EL2 + (ER1 + ER2) + (D2) << std::endl;
-    RowVector3d r1N = r1.cross(updN);
-    RowVector3d r2N = r2.cross(updN);
-    RowVector3d Ir1N = (worldIn1 * r1N.transpose()).transpose();
-    RowVector3d Ir2N = (worldIn2 * r2N.transpose()).transpose();
-    double augMass2 =  r2N * Ir2N.transpose();
-    double augMass1 = r1N * Ir1N.transpose();
-    double augMass  = augMass1 + augMass2;
-
-    double j = (-((1 + CRCoeff) * ((totVelocity1 - totVelocity2).dot(updN)))) / (1.0 / m1.totalMass + 1.0 / m2.totalMass + augMass);
+     TODO: practical 2
+     update m(1,2) comVelocity, angVelocity and COM variables by using a Constraint class of type COLLISION
+     ***********************/
     
-    RowVector3d impulse=RowVector3d::Zero();  //change this to your result
-
-    impulse = j * updN;
-    
-   /* std::cout << "impulse 1: " << (m1.isFixed ? RowVector3d(0, 0, 0) : (impulse / m1.totalMass)) << std::endl;
-    std::cout << "impulse 2: " << (m2.isFixed ? RowVector3d(0, 0, 0) : -(impulse / m2.totalMass)) << std::endl;*/
-
-    RowVector3d velAfter1 = m1.comVelocity + impulse / m1.totalMass;
-    RowVector3d angVelAfter1 = m1.angVelocity +  (worldIn1 * r1.cross(impulse).transpose()).transpose();
-
-    RowVector3d velAfter2 = m2.comVelocity - impulse / m2.totalMass;
-    RowVector3d angVelAfter2 = m2.angVelocity - (worldIn2 * r2.cross(impulse).transpose()).transpose();
-
-
-    EL1 = 0.5 * m1.totalMass * velAfter1.dot(velAfter1);
-    ER1 = 0.5 * angVelAfter1 * worldIn1.inverse() * angVelAfter1.transpose();
-    EL2 = 0.5 * m2.totalMass * velAfter2.dot(velAfter2);
-    ER2 = 0.5 * angVelAfter2 * worldIn2.inverse() * angVelAfter2.transpose();
-    D1 = m1.totalMass * 9.8 * m1.COM.y();
-    D2 = m2.totalMass * 9.8 * m2.COM.y();
-
-    //std::cout << "Ratio: " << (EL1 + ER1) / (EL2 + ER2 + EL1 + ER1) << std::endl;
-  //  std::cout << "Total Energy After: " << (EL1 + ER1) + (EL2 + ER2) + (D2) << std::endl;
-
-    if (impulse.norm()>10e-6){
-      m1.currImpulses.push_back(Impulse(contactPosition, impulse));
-      m2.currImpulses.push_back(Impulse(contactPosition, -impulse));
-    }
-    
-    //updating velocities according to impulses
-    m1.updateImpulseVelocities(angVelAfter1);
-    m2.updateImpulseVelocities(angVelAfter2);
   }
-  
-  
   
   /*********************************************************************
    This function handles a single time step by:
    1. Integrating velocities, positions, and orientations by the timeStep
-   2. detecting and handling collisions with the coefficient of restitutation CRCoeff
-   3. updating the visual scene in fullV and fullT
+   2. (Practical 2) Detecting collisions and encoding them as constraints
+   3. (Practical 2) Iteratively resolved positional and velocity constraints
+   
+   You do not need to update this function in Practical 2
    *********************************************************************/
-  void updateScene(double timeStep, double CRCoeff, double miK, double dragCoeff){
+  void updateScene(const double timeStep, const double CRCoeff, const double tolerance, const int maxIterations){
     
     //integrating velocity, position and orientation from forces and previous states
     for (int i=0;i<meshes.size();i++)
-      meshes[i].integrate(timeStep, dragCoeff);
+      meshes[i].integrate(timeStep);
     
+
     //detecting and handling collisions when found
     //This is done exhaustively: checking every two objects in the scene.
     double depth;
@@ -488,16 +335,114 @@ public:
     for (int i=0;i<meshes.size();i++)
       for (int j=i+1;j<meshes.size();j++)
         if (meshes[i].isCollide(meshes[j],depth, contactNormal, penPosition))
-          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, miK, dragCoeff);
+          handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, tolerance);
+    
+    
+    //Resolving user constraints iteratively until either:
+    //1. Positions or velocities are valid up to tolerance (a full streak of validity in the iteration)
+    //2. maxIterations has run out
+    
+    
+    //Resolving velocity
+    int currIteration=0;
+    int zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.
+    int currConstIndex=0;
+    while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
+      
+      Constraint currConstraint=constraints[currConstIndex];
+      
+      RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
+      RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
+      
+      RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
+      RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
+      //cout<<"(currConstPos1-currConstPos2).norm(): "<<(currConstPos1-currConstPos2).norm()<<endl;
+      //cout<<"(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm(): "<<(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm()<<endl;
+      MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
+      MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
+      MatrixXd currCOMVelocities(2,3); currCOMVelocities<<meshes[currConstraint.m1].comVelocity, meshes[currConstraint.m2].comVelocity;
+      MatrixXd currAngVelocities(2,3); currAngVelocities<<meshes[currConstraint.m1].angVelocity, meshes[currConstraint.m2].angVelocity;
+      
+      Matrix3d invInertiaTensor1=meshes[currConstraint.m1].getCurrInvInertiaTensor();
+      Matrix3d invInertiaTensor2=meshes[currConstraint.m2].getCurrInvInertiaTensor();
+      MatrixXd correctedCOMVelocities, correctedAngVelocities, correctedCOMPositions;
+      
+      bool velocityWasValid=currConstraint.resolveVelocityConstraint(currCOMPositions, currConstPositions, currCOMVelocities, currAngVelocities, invInertiaTensor1, invInertiaTensor2, correctedCOMVelocities,correctedAngVelocities, tolerance);
+      
+      if (velocityWasValid){
+        zeroStreak++;
+      }else{
+        //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
+        zeroStreak=0;
+        meshes[currConstraint.m1].comVelocity =correctedCOMVelocities.row(0);
+        meshes[currConstraint.m2].comVelocity =correctedCOMVelocities.row(1);
+        
+        meshes[currConstraint.m1].angVelocity =correctedAngVelocities.row(0);
+        meshes[currConstraint.m2].angVelocity =correctedAngVelocities.row(1);
+        
+      }
+      
+      currIteration++;
+      currConstIndex=(currConstIndex+1)%(constraints.size());
+    }
+    
+    if (currIteration*constraints.size()>=maxIterations)
+      cout<<"Velocity Constraint resolution reached maxIterations without resolving!"<<endl;
+    
+    
+    //Resolving position
+    currIteration=0;
+    zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.
+    currConstIndex=0;
+    while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
+      
+      Constraint currConstraint=constraints[currConstIndex];
+      
+      RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
+      RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
+      
+      RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
+      RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
+
+      MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
+      MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
+    
+      MatrixXd correctedCOMPositions;
+    
+      bool positionWasValid=currConstraint.resolvePositionConstraint(currCOMPositions, currConstPositions,correctedCOMPositions, tolerance);
+      
+      if (positionWasValid){
+        zeroStreak++;
+      }else{
+        //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
+        zeroStreak=0;
+
+        meshes[currConstraint.m1].COM =correctedCOMPositions.row(0);
+        meshes[currConstraint.m2].COM =correctedCOMPositions.row(1);
+        
+      }
+      
+      currIteration++;
+      currConstIndex=(currConstIndex+1)%(constraints.size());
+    }
+    
+    if (currIteration*constraints.size()>=maxIterations)
+      cout<<"Position Constraint resolution reached maxIterations without resolving!"<<endl;
+    
+    
+    //updating currV according to corrected COM
+    for (int i=0;i<meshes.size();i++)
+      for (int j=0;j<meshes[i].currV.rows();j++)
+        meshes[i].currV.row(j)<<QRot(meshes[i].origV.row(j), meshes[i].orientation)+meshes[i].COM;
     
     currTime+=timeStep;
   }
   
   //loading a scene from the scene .txt files
   //you do not need to update this function
-  bool loadScene(const std::string dataFolder, const std::string sceneFileName){
+  bool loadScene(const std::string dataFolder, const std::string sceneFileName, const std::string constraintFileName){
     
-    ifstream sceneFileHandle;
+    ifstream sceneFileHandle, constraintFileHandle;
     sceneFileHandle.open(dataFolder+std::string("/")+sceneFileName);
     if (!sceneFileHandle.is_open())
       return false;
@@ -526,6 +471,26 @@ public:
       cout << "COM: " << userCOM <<endl;
       cout << "orientation: " << userOrientation <<endl;
     }
+    
+    //Practical 2 change
+    //reading intra-mesh attachment constraints
+    int numofConstraints;
+    constraintFileHandle.open(dataFolder+std::string("/")+constraintFileName);
+    if (!constraintFileHandle.is_open())
+      return false;
+    constraintFileHandle>>numofConstraints;
+    for (int i=0;i<numofConstraints;i++){
+      int attachM1, attachM2, attachV1, attachV2;
+      constraintFileHandle>>attachM1>>attachV1>>attachM2>>attachV2;
+      
+      double initDist=(meshes[attachM1].currV.row(attachV1)-meshes[attachM2].currV.row(attachV2)).norm();
+      //cout<<"initDist: "<<initDist<<endl;
+      double invMass1 = (meshes[attachM1].isFixed ? 0.0 : 1.0/meshes[attachM1].totalMass);  //fixed meshes have infinite mass
+      double invMass2 = (meshes[attachM2].isFixed ? 0.0 : 1.0/meshes[attachM2].totalMass);
+      constraints.push_back(Constraint(DISTANCE, EQUALITY,attachM1, attachV1, attachM2, attachV2, invMass1,invMass2,RowVector3d::Zero(), initDist, 0.0));
+      
+    }
+    
     return true;
   }
   
