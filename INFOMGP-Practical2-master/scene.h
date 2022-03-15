@@ -337,26 +337,39 @@ public:
     double invMass1 = (m1.isFixed ? 0.0 : 1.0/m1.totalMass);  //fixed meshes have infinite mass
     double invMass2 = (m2.isFixed ? 0.0 : 1.0/m2.totalMass);
 
+    RowVector3d com1 = m1.COM;
+    RowVector3d com2 = m2.COM;
+
     RowVector3d contactPosition;
     if (m1.isFixed) {
-       
+        /***************
+         TODO
+         ***************/
+        com2 = m2.COM + depth * contactNormal.normalized();
         contactPosition = penPosition + depth * contactNormal.normalized();
     }
     else if (m2.isFixed) {
-        
+        /***************
+         TODO
+         ***************/
+        com1 = m1.COM - depth * contactNormal.normalized();
         contactPosition = penPosition + depth * contactNormal.normalized();
 
     }
     else { //inverse mass weighting
-   
+   /***************
+    TODO
+    ***************/
+        com2 = m2.COM + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
+        com1 = m1.COM - ((depth * m1.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
+
         contactPosition = penPosition + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
     }
 
-
     
      // collision arm
-    RowVector3d r1 = contactPosition - m1.COM;
-    RowVector3d r2 = penPosition - m2.COM;
+    RowVector3d r1 = contactPosition - com1;
+    RowVector3d r2 = contactPosition - com2;
 
   
     /***************
@@ -407,15 +420,22 @@ public:
         currAngularVelocities, m1.getCurrInvInertiaTensor(), m2.getCurrInvInertiaTensor(), correctedCOMVelocities,
         correctedAngularVelocities, 0.0001);
 
-    m1.comVelocity = correctedCOMVelocities.row(0);
-    m2.comVelocity = correctedCOMVelocities.row(1);
-    m1.angVelocity = correctedAngularVelocities.row(0);
-    m2.angVelocity = correctedAngularVelocities.row(1);
 
-    collisionConstraint.resolvePositionConstraint(currCOMPosition, currVertexPositions, correctedCOMPositions, 0.0001f);
-    
-    m1.COM = correctedCOMPositions.row(0);
-    m2.COM = correctedCOMPositions.row(1);
+    if (!m1.isFixed)
+    {
+        m1.comVelocity = correctedCOMVelocities.row(0);
+        m1.angVelocity = correctedAngularVelocities.row(0);
+    }
+    if (!m2.isFixed)
+    {
+        m2.comVelocity = correctedCOMVelocities.row(1);
+        m2.angVelocity = correctedAngularVelocities.row(1);
+    }
+    collisionConstraint.resolvePositionConstraint(currCOMPosition, currVertexPositions, correctedCOMPositions, 0.01f);
+    if (!m1.isFixed)
+        m1.COM = correctedCOMPositions.row(0);
+    if (!m2.isFixed)
+        m2.COM = correctedCOMPositions.row(1);
 
   }
   
