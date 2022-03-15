@@ -155,7 +155,7 @@ public:
     
     COM += comVelocity * timeStep;
 
-    RowVector3d normAng = angVelocity.normalized();
+    RowVector3d normAng = angVelocity;
 
     //std::cout << "Angular: " << angVelocity << std::endl;
     //std::cout << "Norm angular: " << normAng << std::endl;
@@ -163,6 +163,7 @@ public:
     RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
 
     orientation += 0.5 * timeStep * QMult(q, orientation);
+    orientation.normalize();
 
     for (int i = 0; i < currV.rows(); i++)
     {
@@ -331,7 +332,7 @@ public:
   void handleCollision(Mesh& m1, Mesh& m2,const double& depth, const RowVector3d& contactNormal,const RowVector3d& penPosition, const double CRCoeff, const double tolerance){
     
     
-    //std::cout<<"contactNormal: "<<contactNormal<<std::endl;
+    //std::cout<<"Collision: " << std::endl;
     //std::cout<<"penPosition: "<<penPosition<<std::endl;
     
     double invMass1 = (m1.isFixed ? 0.0 : 1.0/m1.totalMass);  //fixed meshes have infinite mass
@@ -342,76 +343,74 @@ public:
 
     RowVector3d contactPosition;
     if (m1.isFixed) {
-        /***************
-         TODO
-         ***************/
+        
         com2 = m2.COM + depth * contactNormal.normalized();
-        contactPosition = penPosition + depth * contactNormal.normalized();
+        contactPosition = penPosition + depth * contactNormal.normalized(); 
     }
     else if (m2.isFixed) {
-        /***************
-         TODO
-         ***************/
+        
         com1 = m1.COM - depth * contactNormal.normalized();
         contactPosition = penPosition + depth * contactNormal.normalized();
 
     }
     else { //inverse mass weighting
-   /***************
-    TODO
-    ***************/
+   
         com2 = m2.COM + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
         com1 = m1.COM - ((depth * m1.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
 
         contactPosition = penPosition + ((depth * m2.totalMass) / (m1.totalMass + m2.totalMass)) * contactNormal;
     }
 
-    
+    //m1.COM = com1;
+    //m2.COM = com2;
+    double vel1 = (m1.comVelocity.y() > 0 ? 1 : -1) * sqrt(abs(m1.comVelocity.y() * m1.comVelocity.y() - 2 * 9.8 * depth));
+    double vel2 = (m2.comVelocity.y() > 0 ? 1 : -1) * sqrt(abs(m2.comVelocity.y() * m2.comVelocity.y() - 2 * 9.8 * depth));
      // collision arm
     RowVector3d r1 = contactPosition - com1;
     RowVector3d r2 = contactPosition - com2;
-
+    m1.comVelocity << m1.comVelocity.x(), m1.isFixed ? m1.comVelocity.y() : vel1, m1.comVelocity.z();
+    m2.comVelocity << m2.comVelocity.x(), m2.isFixed ? m2.comVelocity.y() : vel2, m2.comVelocity.z();
   
     /***************
      TODO: practical 2
      update m(1,2) comVelocity, angVelocity and COM variables by using a Constraint class of type COLLISION
      ***********************/
     
-    Constraint collisionConstraint(COLLISION, INEQUALITY, 0, 0, 0, 0, invMass1, invMass2, contactNormal, depth, CRCoeff);
+    Constraint collisionConstraint(COLLISION, INEQUALITY, 0, 0, 0, 0, invMass1, invMass2, -contactNormal, depth, CRCoeff);
     Matrix<double, 2, 3> currCOMPosition;
-    currCOMPosition(0,0) == m1.COM.x();
-    currCOMPosition(0, 1) == m1.COM.y();
-    currCOMPosition(0, 2) == m1.COM.z();
-    currCOMPosition(1, 0) == m2.COM.x();
-    currCOMPosition(1, 1) == m2.COM.y();
-    currCOMPosition(1, 2) == m2.COM.z();
+    currCOMPosition(0,0) = m1.COM.x();
+    currCOMPosition(0, 1) = m1.COM.y();
+    currCOMPosition(0, 2) = m1.COM.z();
+    currCOMPosition(1, 0) = m2.COM.x();
+    currCOMPosition(1, 1) = m2.COM.y();
+    currCOMPosition(1, 2) = m2.COM.z();
 
-
+    //std::cout << m2.COM.y() << std::endl;
     Matrix<double, 2, 3> currVertexPositions;
-    currVertexPositions(0, 0) == r1.x();
-    currVertexPositions(0, 1) == r1.y();
-    currVertexPositions(0, 2) == r1.z();
-    currVertexPositions(1, 0) == r2.x();
-    currVertexPositions(1, 1) == r2.y();
-    currVertexPositions(1, 2) == r2.z();
+    currVertexPositions(0, 0) = r1.x();
+    currVertexPositions(0, 1) = r1.y();
+    currVertexPositions(0, 2) = r1.z();
+    currVertexPositions(1, 0) = r2.x();
+    currVertexPositions(1, 1) = r2.y();
+    currVertexPositions(1, 2) = r2.z();
 
 
     Matrix<double, 2, 3> currCOMVelocities;
-    currCOMVelocities(0, 0) == m1.comVelocity.x();
-    currCOMVelocities(0, 1) == m1.comVelocity.y();
-    currCOMVelocities(0, 2) == m1.comVelocity.z();
-    currCOMVelocities(1, 0) == m2.comVelocity.x();
-    currCOMVelocities(1, 1) == m2.comVelocity.y();
-    currCOMVelocities(1, 2) == m2.comVelocity.z();
+    currCOMVelocities(0, 0) = m1.comVelocity.x();
+    currCOMVelocities(0, 1) = m1.comVelocity.y();
+    currCOMVelocities(0, 2) = m1.comVelocity.z();
+    currCOMVelocities(1, 0) = m2.comVelocity.x();
+    currCOMVelocities(1, 1) = m2.comVelocity.y();
+    currCOMVelocities(1, 2) = m2.comVelocity.z();
 
 
     Matrix<double, 2, 3> currAngularVelocities;
-    currAngularVelocities(0, 0) == m1.angVelocity.x();
-    currAngularVelocities(0, 1) == m1.angVelocity.y();
-    currAngularVelocities(0, 2) == m1.angVelocity.z();
-    currAngularVelocities(1, 0) == m2.angVelocity.x();
-    currAngularVelocities(1, 1) == m2.angVelocity.y();
-    currAngularVelocities(1, 2) == m2.angVelocity.z();
+    currAngularVelocities(0, 0) = m1.angVelocity.x();
+    currAngularVelocities(0, 1) = m1.angVelocity.y();
+    currAngularVelocities(0, 2) = m1.angVelocity.z();
+    currAngularVelocities(1, 0) = m2.angVelocity.x();
+    currAngularVelocities(1, 1) = m2.angVelocity.y();
+    currAngularVelocities(1, 2) = m2.angVelocity.z();
    
     MatrixXd correctedCOMVelocities =MatrixXd::Zero(2, 3);
     MatrixXd correctedAngularVelocities = MatrixXd::Zero(2, 3);
@@ -491,7 +490,9 @@ public:
       
       Matrix3d invInertiaTensor1=meshes[currConstraint.m1].getCurrInvInertiaTensor();
       Matrix3d invInertiaTensor2=meshes[currConstraint.m2].getCurrInvInertiaTensor();
-      MatrixXd correctedCOMVelocities, correctedAngVelocities, correctedCOMPositions;
+      MatrixXd correctedCOMVelocities = MatrixXd::Zero(2, 3);
+      MatrixXd correctedAngVelocities = MatrixXd::Zero(2, 3);
+      
       
       bool velocityWasValid=currConstraint.resolveVelocityConstraint(currCOMPositions, currConstPositions, currCOMVelocities, currAngVelocities, invInertiaTensor1, invInertiaTensor2, correctedCOMVelocities,correctedAngVelocities, tolerance);
       
@@ -533,7 +534,7 @@ public:
       MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
       MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
     
-      MatrixXd correctedCOMPositions;
+      MatrixXd correctedCOMPositions = MatrixXd::Zero(2, 3);
     
       bool positionWasValid=currConstraint.resolvePositionConstraint(currCOMPositions, currConstPositions,correctedCOMPositions, tolerance);
       

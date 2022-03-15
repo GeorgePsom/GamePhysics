@@ -36,7 +36,7 @@ public:
       const MatrixXd& currCOMVelocities, const MatrixXd& currAngularVelocities, const Matrix3d& invInertiaTensor1,
       const Matrix3d& invInertiaTensor2, MatrixXd& correctedCOMVelocities, MatrixXd& correctedAngularVelocities,
       double tolerance){
-    
+      //std::cout << "Resolve velocity" << std::endl;
     MatrixXd invMassMatrix=MatrixXd::Zero(12,12);
     RowVectorXd constGradient(12);
     RowVector3d v1 = currVertexPositions.row(0);
@@ -52,13 +52,31 @@ public:
             r2N.x(), r2N.y(), r2N.z();
     }
     else
-         int psola = 5;
+    {
+        RowVector3d d12 = currVertexPositions.row(0) - currVertexPositions.row(1);
+        float Cp = d12.norm() - refValue;
+        RowVector3d r1 = currVertexPositions.row(0) - currCOMPositions.row(0);
+        RowVector3d r2 = currVertexPositions.row(0) - currCOMPositions.row(0);
+        d12.normalize();
+
+        Vector3d r1N = v1.cross(d12);
+        Vector3d r2N = -v2.cross(d12);
+        constGradient << d12.x(), d12.y(), d12.z(),
+            r1N.x(), r1N.y(), r1N.z(),
+            -d12.x(), -d12.y(), -d12.z(),
+            r2N.x(), r2N.y(), r2N.z();
+
+
+      
+    }
+       
 
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < 3; j++)
         {
-            invMassMatrix(0, 0) = invMass1;
+            if(i == j)
+                invMassMatrix(i, j) = invMass1;
         }
     }
 
@@ -66,7 +84,8 @@ public:
     {
         for (int j = 6; j < 9; j++)
         {
-            invMassMatrix(i, j) = invMass2;
+            if(i == j)
+                invMassMatrix(i, j) = invMass2;
         }
     }
 
@@ -138,6 +157,8 @@ public:
   //returns true if constraint was already valid with "currPositions"
   bool resolvePositionConstraint(const MatrixXd& currCOMPositions, const MatrixXd& currConstPositions, MatrixXd& correctedCOMPositions, double tolerance){
     
+      //std::cout << "Resolve position" << std::endl;
+
     MatrixXd invMassMatrix=MatrixXd::Zero(6,6);
     invMassMatrix(0, 0) = invMass1;
     invMassMatrix(1, 1) = invMass1;
@@ -148,9 +169,23 @@ public:
 
     
     RowVectorXd constGradient(6);
-    constGradient << refVector, -refVector;
-    double Cp = (currCOMPositions.row(0) - currCOMPositions.row(1)).dot(refVector) - refValue;
-    if (Cp >= 0)
+    double Cp;
+    if (constraintType == COLLISION)
+    {
+        constGradient << refVector, -refVector;
+        Cp = (currCOMPositions.row(0) - currCOMPositions.row(1)).dot(refVector);
+    }  
+    else
+    {
+        RowVector3d d12 = currConstPositions.row(0) - currConstPositions.row(1);
+        Cp = d12.norm() - refValue;
+        d12.normalize();
+        constGradient << d12, -d12;
+    }
+        
+   
+    if ((constraintEqualityType == INEQUALITY && Cp >= 0) ||
+        constraintEqualityType == EQUALITY && abs(Cp) <= tolerance)
     {
         correctedCOMPositions = currCOMPositions;
         return true;
@@ -160,7 +195,7 @@ public:
     double lamda = -Cp / (constGradient * invMassMatrix * constGradient.transpose());
     RowVectorXd pos(6);
     pos << currCOMPositions.row(0), currCOMPositions.row(1);
-    pos += lamda * invMassMatrix * constGradient;
+    pos += (lamda * invMassMatrix * constGradient.transpose()).transpose();
     correctedCOMPositions.row(0) << pos(0), pos(1), pos(2);
     correctedCOMPositions.row(1) << pos(3), pos(4), pos(5);
     return false;
