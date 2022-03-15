@@ -56,11 +56,11 @@ public:
         RowVector3d d12 = currVertexPositions.row(0) - currVertexPositions.row(1);
         float Cp = d12.norm() - refValue;
         RowVector3d r1 = currVertexPositions.row(0) - currCOMPositions.row(0);
-        RowVector3d r2 = currVertexPositions.row(0) - currCOMPositions.row(0);
+        RowVector3d r2 = currVertexPositions.row(1) - currCOMPositions.row(1);
         d12.normalize();
 
-        Vector3d r1N = v1.cross(d12);
-        Vector3d r2N = -v2.cross(d12);
+        Vector3d r1N = r1.cross(d12);
+        Vector3d r2N = -r2.cross(d12);
         constGradient << d12.x(), d12.y(), d12.z(),
             r1N.x(), r1N.y(), r1N.z(),
             -d12.x(), -d12.y(), -d12.z(),
