@@ -20,7 +20,7 @@ public:
   ConstraintType constraintType;  //The type of the constraint, and will affect the value and the gradient. This SHOULD NOT change after initialization!
   ConstraintEqualityType constraintEqualityType;  //whether the constraint is an equality or an inequality
 
-  float stretchC = 0.8;
+  float stretchC = 0.5;
   
   Constraint(const ConstraintType _constraintType, const ConstraintEqualityType _constraintEqualityType, const int& _m1, const int& _v1, const int& _m2, const int& _v2, const double& _invMass1, const double& _invMass2, const RowVector3d& _refVector, const double& _refValue, const double& _CRCoeff):constraintType(_constraintType), constraintEqualityType(_constraintEqualityType), m1(_m1), v1(_v1), m2(_m2), v2(_v2), invMass1(_invMass1), invMass2(_invMass2),  refValue(_refValue), CRCoeff(_CRCoeff){
     refVector=_refVector;
@@ -38,7 +38,7 @@ public:
       const MatrixXd& currCOMVelocities, const MatrixXd& currAngularVelocities, const Matrix3d& invInertiaTensor1,
       const Matrix3d& invInertiaTensor2, MatrixXd& correctedCOMVelocities, MatrixXd& correctedAngularVelocities,
       double tolerance){
-      //std::cout << "Resolve velocity" << std::endl;
+
     MatrixXd invMassMatrix=MatrixXd::Zero(12,12);
     RowVectorXd constGradient(12);
     RowVector3d v1 = currVertexPositions.row(0);
@@ -52,21 +52,10 @@ public:
     if (constraintType == STRETCH)
     {
         diff = refValue * stretchC;
-        //diff = refValue;
-        //std::cout << "Hello" << std::endl;
     }
     else {
         diff = 0;
     }
-
-    /*if (constraintType == STRETCH)
-    {
-        diff = refValue * 0.8;
-        //std::cout << "Hello" << std::endl;
-    }
-    else {
-        diff = 0;
-    }*/
 
     if (constraintType == COLLISION)
     {
@@ -89,8 +78,6 @@ public:
             r1N.x(), r1N.y(), r1N.z(),
             -d12.x(), -d12.y(), -d12.z(),
             r2N.x(), r2N.y(), r2N.z();
-
-        //std::cout << "Cp: " << Cp << std::endl;
       
     }
        
@@ -113,13 +100,6 @@ public:
         }
     }
 
-
-    //invMassMatrix(0, 0) = invMass1;
-    //invMassMatrix(1, 1) = invMass1;
-    //invMassMatrix(2, 2) = invMass1;
-    //invMassMatrix(6, 6) = invMass2;
-    //invMassMatrix(7, 7) = invMass2;
-    //invMassMatrix(8, 8) = invMass2;
 
     for (int i = 0; i < 3; i++)
     {
@@ -145,7 +125,6 @@ public:
 
     double Ju = constGradient * velocities.transpose();
     if ((abs(Ju) <= tolerance && constraintType == DISTANCE)
-    //    || ((Ju) >= 0 && constraintType == COLLISION) || ((Ju) >= 0 && constraintType == STRETCH))
         || ((Ju) >= 0 && constraintType == COLLISION) || (abs(Cp) <= diff && constraintType == STRETCH))
     {
         correctedCOMVelocities = currCOMVelocities;
@@ -153,11 +132,7 @@ public:
         return true;
     }
 
-    /*if (Cp<0)
-    {
-        Ju *= -1.0;
-        //constGradient *= -1.0;
-    }*/
+
 
     double lamda = -(1 + CRCoeff) * Ju / (constGradient * invMassMatrix * constGradient.transpose());
 
@@ -270,13 +245,7 @@ public:
         diff = 0;
     }
     
-    /*if (constraintType == STRETCH)
-    {
-       
-        Cp *= -1;
-        constGradient *= -1;
 
-    }*/
         
     
     double lamda = (diff -Cp) / (constGradient * invMassMatrix * constGradient.transpose());

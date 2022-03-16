@@ -16,7 +16,7 @@ bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
 float CRCoeff= 1.0;
-bool strecth = true;
+bool strecth = false;
 
 double tolerance = 10e-3;
 int maxIterations=10000;
