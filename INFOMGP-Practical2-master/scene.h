@@ -614,8 +614,16 @@ public:
       cout<<"initDist: "<<initDist<<endl;
       double invMass1 = (meshes[attachM1].isFixed ? 0.0 : 1.0/meshes[attachM1].totalMass);  //fixed meshes have infinite mass
       double invMass2 = (meshes[attachM2].isFixed ? 0.0 : 1.0/meshes[attachM2].totalMass);
-      constraints.push_back(Constraint(DISTANCE, stretch ? INEQUALITY: EQUALITY,attachM1, attachV1, attachM2, attachV2, invMass1,invMass2,RowVector3d::Zero(), initDist, 0.0));
-      
+      if (stretch)
+      {
+          constraints.push_back(Constraint(STRETCH, INEQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist + 3.0 * initDist , 0.0));
+        //  constraints.push_back(Constraint(COMPRESS, INEQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist - 0.5 * initDist, 0.0));
+
+      }
+      else
+          constraints.push_back(Constraint(DISTANCE, EQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist, 0.0));
+
+         
     }
     
     return true;

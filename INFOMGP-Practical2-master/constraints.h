@@ -4,7 +4,7 @@
 using namespace Eigen;
 using namespace std;
 
-typedef enum ConstraintType{DISTANCE, COLLISION} ConstraintType;   //You can expand it for more constraints
+typedef enum ConstraintType{DISTANCE, COLLISION, STRETCH, COMPRESS} ConstraintType;   //You can expand it for more constraints
 typedef enum ConstraintEqualityType{EQUALITY, INEQUALITY} ConstraintEqualityType;
 
 //there is such constraints per two variables that are equal. That is, for every attached vertex there are three such constraints for (x,y,z);
@@ -117,13 +117,21 @@ public:
     RowVectorXd velocities(12);
     velocities << currCOMVelocities.row(0), currAngularVelocities.row(0), currCOMVelocities.row(1), currAngularVelocities.row(1);
     
+    
+
     double Ju = constGradient * velocities.transpose();
     if ((abs(Ju) <= tolerance && constraintEqualityType == EQUALITY)
-        || ((Ju) >= 0 && constraintEqualityType == INEQUALITY && constraintType == COLLISION) || abs(Ju) <= tolerance && constraintEqualityType == INEQUALITY && constraintType == DISTANCE)
+        || ((Ju) >= 0 && constraintEqualityType == INEQUALITY && constraintType == COLLISION) || (Ju <= 0 && constraintType == STRETCH) || (Ju >= 0 && constraintType == COMPRESS))
     {
         correctedCOMVelocities = currCOMVelocities;
         correctedAngularVelocities = currAngularVelocities;
         return true;
+    }
+
+    if (constraintType == STRETCH)
+    {
+        Ju *= -1.0;
+        constGradient *= -1.0;
     }
 
     double lamda = -(1 + CRCoeff) * Ju / (constGradient * invMassMatrix * constGradient.transpose());
@@ -192,32 +200,26 @@ public:
     }  
     else
     {
-        if (constraintEqualityType == INEQUALITY)
-            stretchCompress = true;
+      
         RowVector3d d12 = currConstPositions.row(0) - currConstPositions.row(1);
         Cp = d12.norm() - refValue;
         d12.normalize();
         constGradient << d12, -d12;
     }
         
-    bool stretch =  (Cp > 0.5 * refValue);
-    bool compress = (Cp < -0.5 * refValue);
-    if ((constraintEqualityType == INEQUALITY && Cp >= 0) ||
-        (constraintEqualityType == EQUALITY && abs(Cp) <= tolerance) || (stretchCompress && !compress) || (!stretch && stretchCompress))
+   
+    if ((constraintEqualityType == INEQUALITY && Cp >= 0 && constraintType == COLLISION) ||
+        (constraintEqualityType == EQUALITY && abs(Cp) <= tolerance) || (constraintType == STRETCH && Cp <=0) || (constraintType == COMPRESS && Cp >= 0))
     {
         correctedCOMPositions = currCOMPositions;
         return true;
     }
 
-    if (stretch && stretchCompress)
-    {
-        Cp += 0.5 * refValue;
-
-    }
     
-    if (compress && stretchCompress)
+    
+    if (constraintType == STRETCH)
     {
-        Cp -= 0.5 * refValue;
+       
         Cp *= -1;
         constGradient *= -1;
 
