@@ -19,6 +19,8 @@ public:
   double CRCoeff;                 //extra velocity bias
   ConstraintType constraintType;  //The type of the constraint, and will affect the value and the gradient. This SHOULD NOT change after initialization!
   ConstraintEqualityType constraintEqualityType;  //whether the constraint is an equality or an inequality
+
+  float stretchC = 0.8;
   
   Constraint(const ConstraintType _constraintType, const ConstraintEqualityType _constraintEqualityType, const int& _m1, const int& _v1, const int& _m2, const int& _v2, const double& _invMass1, const double& _invMass2, const RowVector3d& _refVector, const double& _refValue, const double& _CRCoeff):constraintType(_constraintType), constraintEqualityType(_constraintEqualityType), m1(_m1), v1(_v1), m2(_m2), v2(_v2), invMass1(_invMass1), invMass2(_invMass2),  refValue(_refValue), CRCoeff(_CRCoeff){
     refVector=_refVector;
@@ -47,6 +49,16 @@ public:
     float Cp;
     double diff;
 
+    if (constraintType == STRETCH)
+    {
+        diff = refValue * stretchC;
+        //diff = refValue;
+        //std::cout << "Hello" << std::endl;
+    }
+    else {
+        diff = 0;
+    }
+
     /*if (constraintType == STRETCH)
     {
         diff = refValue * 0.8;
@@ -66,7 +78,7 @@ public:
     else
     {
         RowVector3d d12 = currVertexPositions.row(0) - currVertexPositions.row(1);
-        float Cp = d12.norm() - refValue;
+        Cp = d12.norm() - refValue;
         RowVector3d r1 = currVertexPositions.row(0) - currCOMPositions.row(0);
         RowVector3d r2 = currVertexPositions.row(1) - currCOMPositions.row(1);
         d12.normalize();
@@ -134,7 +146,7 @@ public:
     double Ju = constGradient * velocities.transpose();
     if ((abs(Ju) <= tolerance && constraintType == DISTANCE)
     //    || ((Ju) >= 0 && constraintType == COLLISION) || ((Ju) >= 0 && constraintType == STRETCH))
-        || ((Ju) >= 0 && constraintType == COLLISION) || (/*abs(Ju) >= 0 &&*/ constraintType == STRETCH))
+        || ((Ju) >= 0 && constraintType == COLLISION) || (abs(Cp) <= diff && constraintType == STRETCH))
     {
         correctedCOMVelocities = currCOMVelocities;
         correctedAngularVelocities = currAngularVelocities;
@@ -207,7 +219,7 @@ public:
 
     if (constraintType == STRETCH)
     {
-        diff = refValue * 0.8;
+        diff = refValue * stretchC;
         //diff = refValue;
         //std::cout << "Hello" << std::endl;
     }
@@ -249,13 +261,7 @@ public:
     }
 
     if (constraintType == STRETCH) {
-        if (Cp > 0)
-        {
-            //diff = refValue * 0.8;
-            diff *= 1;
-            //std::cout << "Hello" << std::endl;
-        }
-        else
+        if(Cp < 0)
         {
             diff *= -1;
         }
