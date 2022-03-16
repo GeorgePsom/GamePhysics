@@ -430,7 +430,16 @@ public:
         m2.comVelocity = correctedCOMVelocities.row(1);
         m2.angVelocity = correctedAngularVelocities.row(1);
     }
-    collisionConstraint.resolvePositionConstraint(currCOMPosition, currVertexPositions, correctedCOMPositions, 0.01f);
+
+    Matrix<double, 2, 3> currVertexPositionsN;
+    currVertexPositionsN(0, 0) = penPosition.x();
+    currVertexPositionsN(0, 1) = penPosition.y();
+    currVertexPositionsN(0, 2) = penPosition.z();
+    currVertexPositionsN(1, 0) = contactPosition.x();
+    currVertexPositionsN(1, 1) = contactPosition.y();
+    currVertexPositionsN(1, 2) = contactPosition.z();
+
+    collisionConstraint.resolvePositionConstraint(currCOMPosition, currVertexPositionsN, correctedCOMPositions, 0.01f);
     if (!m1.isFixed)
         m1.COM = correctedCOMPositions.row(0);
     if (!m2.isFixed)
@@ -616,7 +625,7 @@ public:
       double invMass2 = (meshes[attachM2].isFixed ? 0.0 : 1.0/meshes[attachM2].totalMass);
       if (stretch)
       {
-          constraints.push_back(Constraint(STRETCH, INEQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist + 3.0 * initDist , 0.0));
+          constraints.push_back(Constraint(STRETCH, EQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist, 0.0));
         //  constraints.push_back(Constraint(COMPRESS, INEQUALITY, attachM1, attachV1, attachM2, attachV2, invMass1, invMass2, RowVector3d::Zero(), initDist - 0.5 * initDist, 0.0));
 
       }

@@ -44,6 +44,18 @@ public:
 
     Vector3d r1N = v1.cross(refVector);
     Vector3d r2N = -v2.cross(refVector);
+    float Cp;
+    double diff;
+
+    /*if (constraintType == STRETCH)
+    {
+        diff = refValue * 0.8;
+        //std::cout << "Hello" << std::endl;
+    }
+    else {
+        diff = 0;
+    }*/
+
     if (constraintType == COLLISION)
     {
         constGradient << refVector.x(), refVector.y(), refVector.z(),
@@ -66,7 +78,7 @@ public:
             -d12.x(), -d12.y(), -d12.z(),
             r2N.x(), r2N.y(), r2N.z();
 
-
+        //std::cout << "Cp: " << Cp << std::endl;
       
     }
        
@@ -120,19 +132,20 @@ public:
     
 
     double Ju = constGradient * velocities.transpose();
-    if ((abs(Ju) <= tolerance && constraintEqualityType == EQUALITY)
-        || ((Ju) >= 0 && constraintEqualityType == INEQUALITY && constraintType == COLLISION) || (Ju <= 0 && constraintType == STRETCH) || (Ju >= 0 && constraintType == COMPRESS))
+    if ((abs(Ju) <= tolerance && constraintType == DISTANCE)
+    //    || ((Ju) >= 0 && constraintType == COLLISION) || ((Ju) >= 0 && constraintType == STRETCH))
+        || ((Ju) >= 0 && constraintType == COLLISION) || (/*abs(Ju) >= 0 &&*/ constraintType == STRETCH))
     {
         correctedCOMVelocities = currCOMVelocities;
         correctedAngularVelocities = currAngularVelocities;
         return true;
     }
 
-    if (constraintType == STRETCH)
+    /*if (Cp<0)
     {
         Ju *= -1.0;
-        constGradient *= -1.0;
-    }
+        //constGradient *= -1.0;
+    }*/
 
     double lamda = -(1 + CRCoeff) * Ju / (constGradient * invMassMatrix * constGradient.transpose());
 
@@ -190,43 +203,78 @@ public:
     invMassMatrix(4, 4) = invMass2;
     invMassMatrix(5, 5) = invMass2;
 
+    double diff=refValue;
+
+    if (constraintType == STRETCH)
+    {
+        diff = refValue * 0.8;
+        //diff = refValue;
+        //std::cout << "Hello" << std::endl;
+    }
+    else {
+        diff = 0;
+    }
+
     bool stretchCompress = false;
     RowVectorXd constGradient(6);
     double Cp;
     if (constraintType == COLLISION)
     {
         constGradient << refVector, -refVector;
-        Cp = (currCOMPositions.row(0) - currCOMPositions.row(1)).dot(refVector);
+        //Cp = (currCOMPositions.row(0) - currCOMPositions.row(1)).dot(refVector);
+
+        Cp = (currConstPositions.row(1) - currConstPositions.row(0)).dot(refVector);
+
+        //std::cout << "Cp: " << Cp << std::endl;
     }  
     else
     {
       
         RowVector3d d12 = currConstPositions.row(0) - currConstPositions.row(1);
         Cp = d12.norm() - refValue;
+        //Cp = d12.norm();
         d12.normalize();
         constGradient << d12, -d12;
+
+        //std::cout << "Cp: " << Cp << std::endl;
+        //std::cout << "ref: " << refValue << std::endl;
     }
         
    
-    if ((constraintEqualityType == INEQUALITY && Cp >= 0 && constraintType == COLLISION) ||
-        (constraintEqualityType == EQUALITY && abs(Cp) <= tolerance) || (constraintType == STRETCH && Cp <=0) || (constraintType == COMPRESS && Cp >= 0))
+    if ((constraintType == COLLISION && Cp >= 0) ||
+        (constraintType == DISTANCE && abs(Cp) <= tolerance) || (abs(Cp) <= diff && constraintType == STRETCH))
     {
         correctedCOMPositions = currCOMPositions;
         return true;
     }
 
+    if (constraintType == STRETCH) {
+        if (Cp > 0)
+        {
+            //diff = refValue * 0.8;
+            diff *= 1;
+            //std::cout << "Hello" << std::endl;
+        }
+        else
+        {
+            diff *= -1;
+        }
+    }
+    else {
+        diff = 0;
+    }
     
-    
-    if (constraintType == STRETCH)
+    /*if (constraintType == STRETCH)
     {
        
         Cp *= -1;
         constGradient *= -1;
 
-    }
+    }*/
         
     
-    double lamda = -Cp / (constGradient * invMassMatrix * constGradient.transpose());
+    double lamda = (diff -Cp) / (constGradient * invMassMatrix * constGradient.transpose());
+    
     RowVectorXd pos(6);
     pos << currCOMPositions.row(0), currCOMPositions.row(1);
     pos += (lamda * invMassMatrix * constGradient.transpose()).transpose();
