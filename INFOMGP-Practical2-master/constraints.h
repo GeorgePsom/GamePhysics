@@ -119,7 +119,7 @@ public:
     
     double Ju = constGradient * velocities.transpose();
     if ((abs(Ju) <= tolerance && constraintEqualityType == EQUALITY)
-        || ((Ju) >= 0 && constraintEqualityType == INEQUALITY))
+        || ((Ju) >= 0 && constraintEqualityType == INEQUALITY && constraintType == COLLISION) || abs(Ju) <= tolerance && constraintEqualityType == INEQUALITY && constraintType == DISTANCE)
     {
         correctedCOMVelocities = currCOMVelocities;
         correctedAngularVelocities = currAngularVelocities;
@@ -134,6 +134,21 @@ public:
     correctedAngularVelocities.row(0) << velocities(3), velocities(4), velocities(5);
     correctedCOMVelocities.row(1) << velocities(6), velocities(7), velocities(8);
     correctedAngularVelocities.row(1) << velocities(9), velocities(10), velocities(11);
+
+
+   /* Ju = -constGradient * velocities.transpose();
+    if (constraintType == DISTANCE && constraintEqualityType == INEQUALITY && Ju >= 0)
+        return true;
+
+    lamda = -(1 + CRCoeff) * Ju / (constGradient * invMassMatrix * constGradient.transpose());
+    velocities += invMassMatrix * constGradient.transpose() * lamda;
+
+    correctedCOMVelocities.row(0) << velocities(0), velocities(1), velocities(2);
+    correctedAngularVelocities.row(0) << velocities(3), velocities(4), velocities(5);
+    correctedCOMVelocities.row(1) << velocities(6), velocities(7), velocities(8);
+    correctedAngularVelocities.row(1) << velocities(9), velocities(10), velocities(11);*/
+
+
 
 
     return false;
@@ -167,7 +182,7 @@ public:
     invMassMatrix(4, 4) = invMass2;
     invMassMatrix(5, 5) = invMass2;
 
-    
+    bool stretchCompress = false;
     RowVectorXd constGradient(6);
     double Cp;
     if (constraintType == COLLISION)
@@ -177,21 +192,38 @@ public:
     }  
     else
     {
+        if (constraintEqualityType == INEQUALITY)
+            stretchCompress = true;
         RowVector3d d12 = currConstPositions.row(0) - currConstPositions.row(1);
         Cp = d12.norm() - refValue;
         d12.normalize();
         constGradient << d12, -d12;
     }
         
-   
+    bool stretch =  (Cp > 0.5 * refValue);
+    bool compress = (Cp < -0.5 * refValue);
     if ((constraintEqualityType == INEQUALITY && Cp >= 0) ||
-        constraintEqualityType == EQUALITY && abs(Cp) <= tolerance)
+        (constraintEqualityType == EQUALITY && abs(Cp) <= tolerance) || (stretchCompress && !compress) || (!stretch && stretchCompress))
     {
         correctedCOMPositions = currCOMPositions;
         return true;
     }
 
+    if (stretch && stretchCompress)
+    {
+        Cp += 0.5 * refValue;
 
+    }
+    
+    if (compress && stretchCompress)
+    {
+        Cp -= 0.5 * refValue;
+        Cp *= -1;
+        constGradient *= -1;
+
+    }
+        
+    
     double lamda = -Cp / (constGradient * invMassMatrix * constGradient.transpose());
     RowVectorXd pos(6);
     pos << currCOMPositions.row(0), currCOMPositions.row(1);

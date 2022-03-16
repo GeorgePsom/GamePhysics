@@ -567,7 +567,7 @@ public:
   
   //loading a scene from the scene .txt files
   //you do not need to update this function
-  bool loadScene(const std::string dataFolder, const std::string sceneFileName, const std::string constraintFileName){
+  bool loadScene(const std::string dataFolder, const std::string sceneFileName, const std::string constraintFileName, bool stretch = false){
     
     ifstream sceneFileHandle, constraintFileHandle;
     sceneFileHandle.open(dataFolder+std::string("/")+sceneFileName);
@@ -611,10 +611,10 @@ public:
       constraintFileHandle>>attachM1>>attachV1>>attachM2>>attachV2;
       
       double initDist=(meshes[attachM1].currV.row(attachV1)-meshes[attachM2].currV.row(attachV2)).norm();
-      //cout<<"initDist: "<<initDist<<endl;
+      cout<<"initDist: "<<initDist<<endl;
       double invMass1 = (meshes[attachM1].isFixed ? 0.0 : 1.0/meshes[attachM1].totalMass);  //fixed meshes have infinite mass
       double invMass2 = (meshes[attachM2].isFixed ? 0.0 : 1.0/meshes[attachM2].totalMass);
-      constraints.push_back(Constraint(DISTANCE, EQUALITY,attachM1, attachV1, attachM2, attachV2, invMass1,invMass2,RowVector3d::Zero(), initDist, 0.0));
+      constraints.push_back(Constraint(DISTANCE, stretch ? INEQUALITY: EQUALITY,attachM1, attachV1, attachM2, attachV2, invMass1,invMass2,RowVector3d::Zero(), initDist, 0.0));
       
     }
     

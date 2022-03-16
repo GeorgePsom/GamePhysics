@@ -16,7 +16,7 @@ bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
 float CRCoeff= 1.0;
-
+bool strecth = true;
 
 double tolerance = 10e-3;
 int maxIterations=10000;
@@ -193,7 +193,7 @@ int main(int argc, char *argv[])
   scene.addMesh(platV, platF, platT, 10000.0, true, platCOM, platOrientation);
   
   //load scene from file
-  scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]));
+  scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]), strecth);
 
   scene.updateScene(0.0, CRCoeff, tolerance, maxIterations);
   
