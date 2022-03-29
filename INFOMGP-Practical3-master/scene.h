@@ -351,7 +351,7 @@ public:
         // Je: 6x12 ???
 
         // B_e: 6x12
-        MatrixXd B_e = D * G_e;
+        MatrixXd B_e = Dc * G_e;
 
         // K_e: 12x12
         MatrixXd K_e = tetVolumes(i) * B_e.transpose() * C * B_e;
