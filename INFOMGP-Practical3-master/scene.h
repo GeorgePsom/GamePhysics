@@ -282,21 +282,97 @@ public:
     //      in a(t) (that means repeating the mass of each vertex three times).
 
     int Vnum = invMasses.size();
+    int Tnum = T.rows();
     
-    MatrixXd M = MatrixXd::Zero(Vnum, Vnum);
+    MatrixXd M = MatrixXd::Zero(3*Vnum, 3*Vnum);
 
-    for (int i = 0; i < Vnum; i++)
+    for (int i = 0; i < 3*Vnum; i++)
     {
-        M(i, i) = 1 / invMasses(i);
+        M(i, i) = 1 / invMasses(i/3);
     }
 
-    //D is the 3 jV j  3 jV j damping matrix which slows down(damps) the movement.It is an
+    float em, lambda;
+
+    em = youngModulus / (2 * (1 + poissonRatio));
+    lambda = (youngModulus * poissonRatio) / ((1+ poissonRatio)*(1-2* poissonRatio));
+
+    //D: is the 3|V| damping matrix which slows down(damps) the movement.It is an
     //     abstraction of physical damping, which is mostly here for the sake of stabilizing the discrete
     //     simulation.
 
-    //MatrixXd G_e = MatrixXd::Zero(Vnum, Vnum);
+    MatrixXd C = MatrixXd::Zero(6, 6);
+    C(0, 0) = lambda +2*em;
+    C(0, 1) = lambda;
+    C(0, 2) = lambda;
+    C(1, 0) = lambda;
+    C(1, 2) = lambda;
+    C(1, 1) = lambda+2*em;
+    C(2, 0) = lambda + sqrt(2);
+    C(2, 1) = lambda + sqrt(2);
+    C(2, 2) = lambda + 2 * em;
+    C(3, 3) = em;
+    C(4, 4) = em;
+    C(5, 5) = em;
 
-    //K
+    MatrixXd D = MatrixXd::Zero(6, 9);
+    D(0, 0) = 1;
+    D(1, 4) = 1;
+    D(2, 8) = 1;
+    D(3, 1) = 0.5;
+    D(3, 3) = 0.5;
+    D(4, 5) = 0.5;
+    D(4, 7) = 0.5;
+    D(5, 2) = 0.5;
+    D(5, 6) = 0.5;
+
+    vector<MatrixXd> J;
+
+    for (int i = 0; i < Tnum; i++) {
+        MatrixXd P_e(4, 4);
+        P_e << 1, origPositions[3*T(i,0)], origPositions[3 * T(i, 0)+1], origPositions[3 * T(i, 0)+2];
+        P_e << 1, origPositions[3 * T(i, 1)], origPositions[3 * T(i, 1) + 1], origPositions[3 * T(i, 1) + 2];
+        P_e << 1, origPositions[3 * T(i, 2)], origPositions[3 * T(i, 2) + 1], origPositions[3 * T(i, 2) + 2];
+        P_e << 1, origPositions[3 * T(i, 3)], origPositions[3 * T(i, 3) + 1], origPositions[3 * T(i, 3) + 2];
+
+        MatrixXd P_eInv = P_e.inverse();
+
+        MatrixXd identity0 = MatrixXd::Zero(4, 3);
+        identity0(0, 1) = 1;
+        identity0(1, 2) = 1;
+        identity0(2, 3) = 1;
+
+        MatrixXd G_e = identity0 * P_eInv;
+
+        MatrixXd B_e = D * G_e;
+
+        MatrixXd K_e = B_e.transpose() * C * B_e;
+
+        J.push_back(K_e);
+    }
+
+    MatrixXd Kn;
+
+    for (int i = 0; i < Tnum; i++) {
+        Kn.block(12 * i, 12 * i, 12, 12) = J[i];
+    }
+
+    MatrixXd Q= MatrixXd::Zero(12*Tnum, 3*Vnum);
+
+    for (int i = 0; i < 12 * Tnum; i++) {
+        
+        int ind12 = (i - 12 * (i / 12));
+
+        int ind4 = ind12 - 4 * (ind12 / 4);
+
+        int indV = T(i/12)
+
+        Q(i,T(i/12,ind4)+);
+
+    }
+
+
+    //K: 12|T|x12|T|
+    //K = 
 
     
     A=M+D*timeStep+K*(timeStep*timeStep);
