@@ -276,6 +276,28 @@ public:
    
     /*************************TODO: create the M, D, K matrices from alpha, beta, poisson ratio, and Young's modulus as learnt in class. Afterward create the matrix "A" with the given timeStep that is the left hand side of the entire system.
      *********/
+
+    //M
+    //  M is the 3|V|x3|V| mass matrix, which is a diagonal matrix with mass value per coordinate
+    //      in a(t) (that means repeating the mass of each vertex three times).
+
+    int Vnum = invMasses.size();
+    
+    MatrixXd M = MatrixXd::Zero(Vnum, Vnum);
+
+    for (int i = 0; i < Vnum; i++)
+    {
+        M(i, i) = 1 / invMasses(i);
+    }
+
+    //D is the 3 jV j  3 jV j damping matrix which slows down(damps) the movement.It is an
+    //     abstraction of physical damping, which is mostly here for the sake of stabilizing the discrete
+    //     simulation.
+
+    //MatrixXd G_e = MatrixXd::Zero(Vnum, Vnum);
+
+    //K
+
     
     A=M+D*timeStep+K*(timeStep*timeStep);
     
