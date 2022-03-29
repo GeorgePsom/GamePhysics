@@ -284,11 +284,12 @@ public:
     int Vnum = invMasses.size();
     int Tnum = T.rows();
     
-    MatrixXd M = MatrixXd::Zero(3*Vnum, 3*Vnum);
+    //M = MatrixXd::Zero(3*Vnum, 3*Vnum);
+    M = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
 
     for (int i = 0; i < 3*Vnum; i++)
     {
-        M(i, i) = 1 / invMasses(i/3);
+        M.insert(i, i) = 1 / invMasses(i/3);
     }
 
     float em, lambda;
@@ -299,8 +300,9 @@ public:
     //D: is the 3|V| damping matrix which slows down(damps) the movement.It is an
     //     abstraction of physical damping, which is mostly here for the sake of stabilizing the discrete
     //     simulation.
-
+    
     MatrixXd C = MatrixXd::Zero(6, 6);
+    //SparseMatrix<double> C(6,6);
     C(0, 0) = lambda +2*em;
     C(0, 1) = lambda;
     C(0, 2) = lambda;
@@ -314,65 +316,90 @@ public:
     C(4, 4) = em;
     C(5, 5) = em;
 
-    MatrixXd D = MatrixXd::Zero(6, 9);
-    D(0, 0) = 1;
-    D(1, 4) = 1;
-    D(2, 8) = 1;
-    D(3, 1) = 0.5;
-    D(3, 3) = 0.5;
-    D(4, 5) = 0.5;
-    D(4, 7) = 0.5;
-    D(5, 2) = 0.5;
-    D(5, 6) = 0.5;
+    MatrixXd Dc = MatrixXd::Zero(6, 9);
+    Dc = SparseMatrix<double>(6, 9);
+    Dc(0, 0) = 1;
+    Dc(1, 4) = 1;
+    Dc(2, 8) = 1;
+    Dc(3, 1) = 0.5;
+    Dc(3, 3) = 0.5;
+    Dc(4, 5) = 0.5;
+    Dc(4, 7) = 0.5;
+    Dc(5, 2) = 0.5;
+    Dc(5, 6) = 0.5;
 
     vector<MatrixXd> J;
 
     for (int i = 0; i < Tnum; i++) {
         MatrixXd P_e(4, 4);
-        P_e << 1, origPositions[3*T(i,0)], origPositions[3 * T(i, 0)+1], origPositions[3 * T(i, 0)+2];
-        P_e << 1, origPositions[3 * T(i, 1)], origPositions[3 * T(i, 1) + 1], origPositions[3 * T(i, 1) + 2];
-        P_e << 1, origPositions[3 * T(i, 2)], origPositions[3 * T(i, 2) + 1], origPositions[3 * T(i, 2) + 2];
-        P_e << 1, origPositions[3 * T(i, 3)], origPositions[3 * T(i, 3) + 1], origPositions[3 * T(i, 3) + 2];
+        //P_e << 1.0 , 2.0 , 3.0,  4.0;
+        P_e << 1, origPositions[3*T(i,0)], origPositions[3 * T(i, 0)+1], origPositions[3 * T(i, 0)+2],
+            1, origPositions[3 * T(i, 1)], origPositions[3 * T(i, 1) + 1], origPositions[3 * T(i, 1) + 2],
+            1, origPositions[3 * T(i, 2)], origPositions[3 * T(i, 2) + 1], origPositions[3 * T(i, 2) + 2],
+            1, origPositions[3 * T(i, 3)], origPositions[3 * T(i, 3) + 1], origPositions[3 * T(i, 3) + 2];
 
         MatrixXd P_eInv = P_e.inverse();
 
-        MatrixXd identity0 = MatrixXd::Zero(4, 3);
+        MatrixXd identity0 = MatrixXd::Zero(3, 4);
         identity0(0, 1) = 1;
         identity0(1, 2) = 1;
         identity0(2, 3) = 1;
 
+        // G_e: 3x4
         MatrixXd G_e = identity0 * P_eInv;
 
+        // Je: 6x12 ???
+
+        // B_e: 6x12
         MatrixXd B_e = D * G_e;
 
-        MatrixXd K_e = B_e.transpose() * C * B_e;
+        // K_e: 12x12
+        MatrixXd K_e = tetVolumes(i) * B_e.transpose() * C * B_e;
 
         J.push_back(K_e);
     }
 
-    MatrixXd Kn;
+    //K: 12|T|x12|T|
+
+    //MatrixXd Kn;
+    SparseMatrix<double> Kn(Tnum,Tnum);
 
     for (int i = 0; i < Tnum; i++) {
-        Kn.block(12 * i, 12 * i, 12, 12) = J[i];
+        //Kn.block(12 * i, 12 * i, 12, 12) = J[i];
+
+        for (int k = 0; k < 12; k++) {
+            for (int l = 0; l < 12; l++) {
+                Kn.insert(12*i+k,12*i+l) = J[i](k,l);
+            }
+        }
     }
 
-    MatrixXd Q= MatrixXd::Zero(12*Tnum, 3*Vnum);
+    //MatrixXd Q= MatrixXd::Zero(12*Tnum, 3*Vnum);
+    SparseMatrix<double> Q(12 * Tnum, 3 * Vnum);
 
-    for (int i = 0; i < 12 * Tnum; i++) {
-        
-        int ind12 = (i - 12 * (i / 12));
+    for (int i = 0; i < Tnum; i++) {
+        for (int v = 0; v < 4; v++)
+        {
+            for (int c = 0; c < 3; c++)
+            {
+                int rowIndex = 12 * i + 3 * v + c;
+                int vIndex = T(i, v);
 
-        int ind4 = ind12 - 4 * (ind12 / 4);
 
-        int indV = T(i/12)
-
-        Q(i,T(i/12,ind4)+);
+                Q.insert(rowIndex, vIndex * 3 + c);
+            }
+        }
 
     }
 
 
-    //K: 12|T|x12|T|
-    //K = 
+    SparseMatrix<double> K(3 * Vnum, 3 * Vnum);
+
+    K = Q.transpose() * Kn * Q;
+
+    D = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
+
+    D = alpha * M + beta * K;
 
     
     A=M+D*timeStep+K*(timeStep*timeStep);
