@@ -348,10 +348,15 @@ public:
         // G_e: 3x4
         MatrixXd G_e = identity0 * P_eInv;
 
-        // Je: 6x12 ???
+        // Je: 9x12
+        MatrixXd J_e = MatrixXd::Zero(9, 12);
+        J_e.block(0, 0, 3, 4) = G_e;
+        J_e.block(3, 4, 3, 4) = G_e;
+        J_e.block(6, 8, 3, 4) = G_e;
+
 
         // B_e: 6x12
-        MatrixXd B_e = Dc * G_e;
+        MatrixXd B_e = Dc * J_e;
 
         // K_e: 12x12
         MatrixXd K_e = tetVolumes(i) * B_e.transpose() * C * B_e;
@@ -362,10 +367,16 @@ public:
     //K: 12|T|x12|T|
 
     //MatrixXd Kn;
-    SparseMatrix<double> Kn(Tnum,Tnum);
+    SparseMatrix<double> Kn(12*Tnum,12*Tnum);
+
+    // reserve space to make the initialization faster
+    Kn.reserve(VectorXi::Constant(12 * Tnum, 12));
+
+    //cout << "Tnum:" << Tnum << endl;
 
     for (int i = 0; i < Tnum; i++) {
         //Kn.block(12 * i, 12 * i, 12, 12) = J[i];
+        //cout << i << endl;
 
         for (int k = 0; k < 12; k++) {
             for (int l = 0; l < 12; l++) {
@@ -376,6 +387,8 @@ public:
 
     //MatrixXd Q= MatrixXd::Zero(12*Tnum, 3*Vnum);
     SparseMatrix<double> Q(12 * Tnum, 3 * Vnum);
+
+    Q.reserve(VectorXi::Constant(3 * Vnum, 12));
 
     for (int i = 0; i < Tnum; i++) {
         for (int v = 0; v < 4; v++)
@@ -448,8 +461,16 @@ public:
       return;
     
     /****************TODO: construct rhs (right-hand side) and use ASolver->solve(rhs) to solve for velocities********/
+
+    int Vnum = invMasses.size();
     
-    VectorXd rhs = VectorXd::Zero(currVelocities.size());  //REMOVE THIS! it's a stub
+    VectorXd rhs(3*Vnum,1);  //REMOVE THIS! it's a stub
+
+    rhs = M * currVelocities;
+
+    rhs = rhs - timeStep * (K * (currPositions - origPositions));
+
+
     currVelocities=ASolver->solve(rhs);
   }
   
