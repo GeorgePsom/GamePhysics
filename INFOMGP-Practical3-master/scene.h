@@ -287,12 +287,14 @@ public:
     //M = MatrixXd::Zero(3*Vnum, 3*Vnum);
     M = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
 
-    for (int i = 0; i < 3*Vnum; i++)
+    for (int i = 0; i < Vnum; i++)
     {
-        M.insert(i, i) = 1 / invMasses(i/3);
+        M.insert(i * 3, i * 3) = 1 / invMasses(i);
+        M.insert(i * 3 + 1, i * 3 + 1) = 1 / invMasses(i);
+        M.insert(i * 3 + 2, i * 3 + 2) = 1 / invMasses(i);
     }
 
-    float em, lambda;
+    double em, lambda;
 
     em = youngModulus / (2 * (1 + poissonRatio));
     lambda = (youngModulus * poissonRatio) / ((1+ poissonRatio)*(1-2* poissonRatio));
@@ -309,8 +311,8 @@ public:
     C(1, 0) = lambda;
     C(1, 2) = lambda;
     C(1, 1) = lambda+2*em;
-    C(2, 0) = lambda + sqrt(2);
-    C(2, 1) = lambda + sqrt(2);
+    C(2, 0) = lambda;
+    C(2, 1) = lambda;
     C(2, 2) = lambda + 2 * em;
     C(3, 3) = em;
     C(4, 4) = em;
@@ -399,14 +401,14 @@ public:
                 int vIndex = T(i, v);
 
 
-                Q.insert(rowIndex, vIndex * 3 + c);
+                Q.insert(rowIndex, vIndex * 3 + c)=1;
             }
         }
 
     }
 
 
-    SparseMatrix<double> K(3 * Vnum, 3 * Vnum);
+    K = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
 
     K = Q.transpose() * Kn * Q;
 
@@ -463,12 +465,20 @@ public:
     /****************TODO: construct rhs (right-hand side) and use ASolver->solve(rhs) to solve for velocities********/
 
     int Vnum = invMasses.size();
+
+    VectorXd f_ext(3 * Vnum, 1);
+
+    for (int i = 0; i < Vnum; i++) {
+
+        f_ext(i * 3, 0) = 0;
+        f_ext(i * 3 + 1, 0) = (-9.81 / invMasses(i));
+        f_ext(i * 3 + 2, 0) = 0;
+    }
+
     
-    VectorXd rhs(3*Vnum,1);  //REMOVE THIS! it's a stub
+    VectorXd rhs(3*Vnum,1);
 
-    rhs = M * currVelocities;
-
-    rhs = rhs - timeStep * (K * (currPositions - origPositions));
+    rhs = M * currVelocities - timeStep * (K * (currPositions - origPositions) - f_ext);
 
 
     currVelocities=ASolver->solve(rhs);
