@@ -283,16 +283,28 @@ public:
 
     int Vnum = invMasses.size();
     int Tnum = T.rows();
+
+    cout << "V: " << Vnum << endl;
+    cout << "T: " << Tnum << endl;
     
     //M = MatrixXd::Zero(3*Vnum, 3*Vnum);
     M = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
 
+    vector<Triplet<double>> tripletListM;
+    tripletListM.reserve(Vnum * 3);
+
     for (int i = 0; i < Vnum; i++)
     {
-        M.insert(i * 3, i * 3) = 1 / invMasses(i);
-        M.insert(i * 3 + 1, i * 3 + 1) = 1 / invMasses(i);
-        M.insert(i * 3 + 2, i * 3 + 2) = 1 / invMasses(i);
+        //M.insert(i * 3, i * 3) = 1 / invMasses(i);
+        //M.insert(i * 3 + 1, i * 3 + 1) = 1 / invMasses(i);
+        //M.insert(i * 3 + 2, i * 3 + 2) = 1 / invMasses(i);
+
+        tripletListM.push_back(Triplet<double>(i * 3, i * 3, 1 / invMasses(i)));
+        tripletListM.push_back(Triplet<double>(i * 3 + 1, i * 3 + 1, 1 / invMasses(i)));
+        tripletListM.push_back(Triplet<double>(i * 3 + 2, i * 3 + 2, 1 /  invMasses(i)));
     }
+
+    M.setFromTriplets(tripletListM.begin(), tripletListM.end());
 
     double em, lambda;
 
@@ -340,7 +352,10 @@ public:
             1, origPositions[3 * T(i, 2)], origPositions[3 * T(i, 2) + 1], origPositions[3 * T(i, 2) + 2],
             1, origPositions[3 * T(i, 3)], origPositions[3 * T(i, 3) + 1], origPositions[3 * T(i, 3) + 2];
 
-        MatrixXd P_eInv = P_e.inverse();
+
+
+        MatrixXd P_eInv(4, 4);
+        P_eInv = P_e.inverse();
 
         MatrixXd identity0 = MatrixXd::Zero(3, 4);
         identity0(0, 1) = 1;
@@ -356,9 +371,27 @@ public:
         J_e.block(3, 4, 3, 4) = G_e;
         J_e.block(6, 8, 3, 4) = G_e;
 
+        MatrixXd Perm = MatrixXd::Zero(12, 12);
+        Perm = SparseMatrix<double>(12, 12);
+        Perm(0, 0) = 1;
+        Perm(1, 3) = 1;
+        Perm(2, 6) = 1;
+        Perm(3, 9) = 1;
+        Perm(4, 1) = 1;
+        Perm(5, 4) = 1;
+        Perm(6, 7) = 1;
+        Perm(7, 10) = 1;
+        Perm(8, 2) = 1;
+        Perm(9, 5) = 1;
+        Perm(10, 8) = 1;
+        Perm(11, 11) = 1;
+
+        // Je: 9x12
+        MatrixXd J_eN = MatrixXd::Zero(9, 12);
+        J_eN = J_e * Perm;
 
         // B_e: 6x12
-        MatrixXd B_e = Dc * J_e;
+        MatrixXd B_e = Dc * J_eN;
 
         // K_e: 12x12
         MatrixXd K_e = tetVolumes(i) * B_e.transpose() * C * B_e;
@@ -372,40 +405,48 @@ public:
     SparseMatrix<double> Kn(12*Tnum,12*Tnum);
 
     // reserve space to make the initialization faster
-    Kn.reserve(VectorXi::Constant(12 * Tnum, 12));
+    //Kn.reserve(VectorXi::Constant(12 * Tnum, 12));
 
     //cout << "Tnum:" << Tnum << endl;
 
-    for (int i = 0; i < Tnum; i++) {
-        //Kn.block(12 * i, 12 * i, 12, 12) = J[i];
-        //cout << i << endl;
+    vector<Triplet<double>> tripletListK;
+    tripletListK.reserve(Tnum*12*12);
 
+    for (int i = 0; i < Tnum; i++)
+    {
         for (int k = 0; k < 12; k++) {
             for (int l = 0; l < 12; l++) {
-                Kn.insert(12*i+k,12*i+l) = J[i](k,l);
+                tripletListK.push_back(Triplet<double>(12 * i + k, 12 * i + l, J[i](k, l)));
             }
         }
     }
 
+    Kn.setFromTriplets(tripletListK.begin(), tripletListK.end());
+
+
     //MatrixXd Q= MatrixXd::Zero(12*Tnum, 3*Vnum);
     SparseMatrix<double> Q(12 * Tnum, 3 * Vnum);
 
-    Q.reserve(VectorXi::Constant(3 * Vnum, 12));
+    vector<Triplet<double>> tripletListQ;
+    tripletListQ.reserve(Tnum * 12);
+
 
     for (int i = 0; i < Tnum; i++) {
         for (int v = 0; v < 4; v++)
         {
             for (int c = 0; c < 3; c++)
             {
-                int rowIndex = 12 * i + 3 * v + c;
+                int rowIndex = 12 * i + v * 3 + c;
                 int vIndex = T(i, v);
 
-
-                Q.insert(rowIndex, vIndex * 3 + c)=1;
+                //Q.insert(rowIndex, vIndex * 3 + c)=1;
+                tripletListQ.push_back(Triplet<double>(rowIndex, vIndex * 3 + c, 1));
             }
         }
 
     }
+
+    Q.setFromTriplets(tripletListQ.begin(), tripletListQ.end());
 
 
     K = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
@@ -414,10 +455,11 @@ public:
 
     D = SparseMatrix<double>(3 * Vnum, 3 * Vnum);
 
-    D = alpha * M + beta * K;
+    D = _alpha * M + _beta * K;
+    //D = alpha * M + beta * K;
 
-    
     A=M+D*timeStep+K*(timeStep*timeStep);
+    //A = M + D * timeStep;
     
     //Should currently fail since A is empty
     if (ASolver==NULL)
@@ -465,6 +507,7 @@ public:
     /****************TODO: construct rhs (right-hand side) and use ASolver->solve(rhs) to solve for velocities********/
 
     int Vnum = invMasses.size();
+    int Tnum = T.rows();
 
     VectorXd f_ext(3 * Vnum, 1);
 
@@ -479,6 +522,7 @@ public:
     VectorXd rhs(3*Vnum,1);
 
     rhs = M * currVelocities - timeStep * (K * (currPositions - origPositions) - f_ext);
+    //rhs = M * currVelocities + timeStep * f_ext);
 
 
     currVelocities=ASolver->solve(rhs);
