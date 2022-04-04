@@ -207,7 +207,7 @@ int main(int argc, char* argv[])
 
     //load scene from file
     scene.loadScene(std::string(argv[1]), std::string(argv[2]), std::string(argv[3]));
-    scene.initScene(timeStep, 0.75, 0.75);
+    scene.initScene(timeStep, 0.15, 0.15);
     //scene.setPlatformBarriers(platV, CRCoeff);
 
     scene.updateScene(0.0, CRCoeff, tolerance, maxIterations, shrink, expand);

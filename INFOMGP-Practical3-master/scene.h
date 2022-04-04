@@ -525,9 +525,9 @@ public:
             if (currTime > 0.5 || currTime == 0)
                 vCOM = RowVector3d::Zero();
             vCOM.normalize();
-            f_ext(i * 3, 0) = 75.0 * vCOM.x() / invMasses(i);
-            f_ext(i * 3 + 1, 0) = (75.0 * vCOM.y() - 9.81) / invMasses(i);
-            f_ext(i * 3 + 2, 0) = 75.0 * vCOM.z() / invMasses(i);
+            f_ext(i * 3, 0) = 30.0 * vCOM.x() / invMasses(i);
+            f_ext(i * 3 + 1, 0) = (30.0 * vCOM.y() - 9.81) / invMasses(i);
+            f_ext(i * 3 + 2, 0) = 30.0 * vCOM.z() / invMasses(i);
         }
 
 
