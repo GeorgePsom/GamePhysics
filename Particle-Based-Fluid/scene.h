@@ -5,6 +5,12 @@
 #include <fstream>
 #include <igl/bounding_box.h>
 #include <igl/readMESH.h>
+#include <igl/bounding_box.h>
+#include <igl/readOFF.h>
+#include <igl/per_vertex_normals.h>
+#include <igl/edge_topology.h>
+#include <igl/diag.h>
+#include <igl/copyleft/tetgen/tetrahedralize.h>
 #include "ccd.h"
 #include "volInt.h"
 #include "auxfunctions.h"
@@ -596,7 +602,24 @@ public:
       RowVector4d userOrientation;
       sceneFileHandle>>MESHFileName>>density>>youngModulus>>poissonRatio>>isFixed>>userCOM(0)>>userCOM(1)>>userCOM(2)>>userOrientation(0)>>userOrientation(1)>>userOrientation(2)>>userOrientation(3);
       userOrientation.normalize();
-      igl::readMESH(dataFolder+std::string("/")+MESHFileName,objV,objT, objF);
+      if (MESHFileName.find(".off") != std::string::npos) {
+          MatrixXd VOFF;
+          MatrixXi FOFF;
+          igl::readOFF(dataFolder + std::string("/") + MESHFileName, VOFF, FOFF);
+          RowVectorXd mins = VOFF.colwise().minCoeff();
+          RowVectorXd maxs = VOFF.colwise().maxCoeff();
+          for (int k = 0; k < VOFF.rows(); k++)
+              VOFF.row(k) << 25.0 * (VOFF.row(k) - mins).array() / (maxs - mins).array();
+
+          if (!isFixed)
+              igl::copyleft::tetgen::tetrahedralize(VOFF, FOFF, "pq1.1", objV, objT, objF);
+          else
+              igl::copyleft::tetgen::tetrahedralize(VOFF, FOFF, "pq1.414Y", objV, objT, objF);
+      }
+      else {
+          igl::readMESH(dataFolder + std::string("/") + MESHFileName, objV, objT, objF);
+      }
+      //igl::readMESH(dataFolder+std::string("/")+MESHFileName,objV,objT, objF);
       
       //fixing weird orientation problem
       MatrixXi tempF(objF.rows(),3);
