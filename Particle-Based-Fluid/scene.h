@@ -308,7 +308,7 @@ public:
 //This class contains the entire scene operations, and the engine time loop.
 class Scene{
 public:
-  double currTime;
+  double currTime = 0.0;
   int numFullV, numFullT;
   std::vector<Mesh> meshes;
   
@@ -462,16 +462,21 @@ public:
    You do not need to update this function in Practical 2
    *********************************************************************/
   void updateScene(const double timeStep, const double CRCoeff, const double tolerance, const int maxIterations){
-    
+      
     //integrating velocity, position and orientation from forces and previous states
+    omp_set_num_threads(omp_get_max_threads());
+#pragma omp parallel for 
     for (int i=0;i<meshes.size();i++)
       meshes[i].integrate(timeStep);
-    
+#pragma omp barrier
 
     //detecting and handling collisions when found
     //This is done exhaustively: checking every two objects in the scene.
     double depth;
     RowVector3d contactNormal, penPosition;
+    omp_set_num_threads(omp_get_max_threads());
+
+
     for (int i=0;i<meshes.size();i++)
       for (int j=i+1;j<meshes.size();j++)
         if (meshes[i].isCollide(meshes[j],depth, contactNormal, penPosition))
@@ -625,8 +630,23 @@ public:
       MatrixXi tempF(objF.rows(),3);
       tempF<<objF.col(2), objF.col(1), objF.col(0);
       objF=tempF;
+
       
-      addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
+      //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
+      for (int k = 0; k < 7; k++)
+      {
+          for (int j = 0; j < k+1; j++)
+          {
+              for (int i = 0; i < k+1; i++)
+              {
+                  RowVector3d com;
+                  com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;
+                  addMesh(objV, objF, objT, density, isFixed, com, userOrientation);
+              }
+          }
+             
+          
+      }
       cout << "COM: " << userCOM <<endl;
       cout << "orientation: " << userOrientation <<endl;
     }

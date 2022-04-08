@@ -31,7 +31,7 @@ Eigen::RowVector4d platOrientation;
 
 void createPlatform()
 {
-  double platWidth=100.0;
+  double platWidth=1000.0;
   platCOM<<0.0,-5.0,-0.0;
   platV.resize(9,3);
   platF.resize(12,3);
