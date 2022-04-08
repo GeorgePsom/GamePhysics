@@ -21,6 +21,8 @@ bool strecth = false;
 double tolerance = 10e-3;
 int maxIterations=10000;
 
+bool platVisibility = true;
+
 Scene scene;
 
 Eigen::MatrixXd platV;
@@ -29,10 +31,34 @@ Eigen::MatrixXi platT;
 Eigen::RowVector3d platCOM;
 Eigen::RowVector4d platOrientation;
 
+Eigen::MatrixXd platV1;
+Eigen::MatrixXi platF1;
+Eigen::MatrixXi platT1;
+Eigen::RowVector3d platCOM1;
+Eigen::RowVector4d platOrientation1;
+
+Eigen::MatrixXd platV2;
+Eigen::MatrixXi platF2;
+Eigen::MatrixXi platT2;
+Eigen::RowVector3d platCOM2;
+Eigen::RowVector4d platOrientation2;
+
+Eigen::MatrixXd platV3;
+Eigen::MatrixXi platF3;
+Eigen::MatrixXi platT3;
+Eigen::RowVector3d platCOM3;
+Eigen::RowVector4d platOrientation3;
+
+Eigen::MatrixXd platV4;
+Eigen::MatrixXi platF4;
+Eigen::MatrixXi platT4;
+Eigen::RowVector3d platCOM4;
+Eigen::RowVector4d platOrientation4;
+
 void createPlatform()
 {
-  double platWidth=1000.0;
-  platCOM<<0.0,-5.0,-0.0;
+  double platWidth=200.0;
+  platCOM<<0.0, -platWidth, 0.0;
   platV.resize(9,3);
   platF.resize(12,3);
   platT.resize(12,4);
@@ -61,6 +87,131 @@ void createPlatform()
   platOrientation<<1.0,0.0,0.0,0.0;
   
   platT<<platF, VectorXi::Constant(12,8);
+
+
+  platCOM1 << platWidth- platWidth / 20.0, platWidth / 20.0, 0.0;
+  platV1.resize(9, 3);
+  platF1.resize(12, 3);
+  platT1.resize(12, 4);
+  platV1 << -platWidth, 0.0, -platWidth,
+      -platWidth, 0.0, platWidth,
+      platWidth, 0.0, platWidth,
+      platWidth, 0.0, -platWidth,
+      -platWidth, -platWidth / 10.0, -platWidth,
+      -platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, -platWidth,
+      0.0, -platWidth / 20.0, 0.0;
+  platF1 << 0, 1, 2,
+      2, 3, 0,
+      6, 5, 4,
+      4, 7, 6,
+      1, 0, 5,
+      0, 4, 5,
+      2, 1, 6,
+      1, 5, 6,
+      3, 2, 7,
+      2, 6, 7,
+      0, 3, 4,
+      3, 7, 4;
+
+  platOrientation1 << 0.0, 1.0, 1.0, 0.0;
+
+  platT1 << platF1, VectorXi::Constant(12, 8);
+
+
+
+  platCOM2 << 0.0, platWidth / 20.0, platWidth- platWidth / 20.0;
+  platV2.resize(9, 3);
+  platF2.resize(12, 3);
+  platT2.resize(12, 4);
+  platV2 << -platWidth, 0.0, -platWidth,
+      -platWidth, 0.0, platWidth,
+      platWidth, 0.0, platWidth,
+      platWidth, 0.0, -platWidth,
+      -platWidth, -platWidth / 10.0, -platWidth,
+      -platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, -platWidth,
+      0.0, -platWidth / 20.0, 0.0;
+  platF2 << 0, 1, 2,
+      2, 3, 0,
+      6, 5, 4,
+      4, 7, 6,
+      1, 0, 5,
+      0, 4, 5,
+      2, 1, 6,
+      1, 5, 6,
+      3, 2, 7,
+      2, 6, 7,
+      0, 3, 4,
+      3, 7, 4;
+
+  platOrientation2 << 0.0, 0.0, 1.0, 1.0;
+
+  platT2 << platF2, VectorXi::Constant(12, 8);
+
+
+
+  platCOM3 << -platWidth+ platWidth / 20.0, platWidth / 20.0, 0.0;
+  platV3.resize(9, 3);
+  platF3.resize(12, 3);
+  platT3.resize(12, 4);
+  platV3 << -platWidth, 0.0, -platWidth,
+      -platWidth, 0.0, platWidth,
+      platWidth, 0.0, platWidth,
+      platWidth, 0.0, -platWidth,
+      -platWidth, -platWidth / 10.0, -platWidth,
+      -platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, -platWidth,
+      0.0, -platWidth / 20.0, 0.0;
+  platF3 << 0, 1, 2,
+      2, 3, 0,
+      6, 5, 4,
+      4, 7, 6,
+      1, 0, 5,
+      0, 4, 5,
+      2, 1, 6,
+      1, 5, 6,
+      3, 2, 7,
+      2, 6, 7,
+      0, 3, 4,
+      3, 7, 4;
+
+  platOrientation3 << 0.0, 1.0, 1.0, 0.0;
+
+  platT3 << platF3, VectorXi::Constant(12, 8);
+
+  platCOM4 << 0.0, platWidth / 20.0, -platWidth + platWidth / 20.0;
+  platV4.resize(9, 3);
+  platF4.resize(12, 3);
+  platT4.resize(12, 4);
+  platV4 << -platWidth, 0.0, -platWidth,
+      -platWidth, 0.0, platWidth,
+      platWidth, 0.0, platWidth,
+      platWidth, 0.0, -platWidth,
+      -platWidth, -platWidth / 10.0, -platWidth,
+      -platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, platWidth,
+      platWidth, -platWidth / 10.0, -platWidth,
+      0.0, -platWidth / 20.0, 0.0;
+  platF4 << 0, 1, 2,
+      2, 3, 0,
+      6, 5, 4,
+      4, 7, 6,
+      1, 0, 5,
+      0, 4, 5,
+      2, 1, 6,
+      1, 5, 6,
+      3, 2, 7,
+      2, 6, 7,
+      0, 3, 4,
+      3, 7, 4;
+
+  platOrientation4 << 0.0, 0.0, 1.0, 1.0;
+
+  platT4 << platF4, VectorXi::Constant(12, 8);
   
   
 }
@@ -69,6 +220,7 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
 {
   RowVector3d platColor; platColor<<0.8,0.8,0.8;
   RowVector3d meshColor; meshColor<<0.8,0.2,0.2;
+  //RowVector3d transparentColor; transparentColor << 0.8, 0.2, 0.2, 0.0;
   viewer.core().align_camera_center(scene.meshes[0].currV);
   for (int i=0;i<scene.meshes.size();i++){
     viewer.data_list[i].clear();
@@ -79,7 +231,29 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
   }
   viewer.data_list[0].show_lines=false;
   viewer.data_list[0].set_colors(platColor.replicate(scene.meshes[0].F.rows(),1));
+  //viewer.data_list[0].set_colors(transparentColor);
   viewer.data_list[0].set_face_based(true);
+  viewer.data_list[0].set_visible(platVisibility);
+
+  viewer.data_list[1].show_lines = false;
+  viewer.data_list[1].set_colors(platColor.replicate(scene.meshes[1].F.rows(), 1));
+  viewer.data_list[1].set_face_based(true);
+  viewer.data_list[1].set_visible(platVisibility);
+
+  viewer.data_list[2].show_lines = false;
+  viewer.data_list[2].set_colors(platColor.replicate(scene.meshes[2].F.rows(), 1));
+  viewer.data_list[2].set_face_based(true);
+  viewer.data_list[2].set_visible(platVisibility);
+
+  viewer.data_list[3].show_lines = false;
+  viewer.data_list[3].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
+  viewer.data_list[3].set_face_based(true);
+  viewer.data_list[3].set_visible(platVisibility);
+
+  viewer.data_list[4].show_lines = false;
+  viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
+  viewer.data_list[4].set_face_based(true);
+  viewer.data_list[4].set_visible(platVisibility);
   //viewer.core.align_camera_center(scene.meshes[0].currV);
   
   //updating constraint viewing
@@ -191,6 +365,10 @@ int main(int argc, char *argv[])
   //create platform
   createPlatform();
   scene.addMesh(platV, platF, platT, 10000.0, true, platCOM, platOrientation);
+  scene.addMesh(platV1, platF1, platT1, 10000.0, true, platCOM1, platOrientation1);
+  scene.addMesh(platV2, platF2, platT2, 10000.0, true, platCOM2, platOrientation2);
+  scene.addMesh(platV3, platF3, platT3, 10000.0, true, platCOM3, platOrientation3);
+  scene.addMesh(platV4, platF4, platT4, 10000.0, true, platCOM4, platOrientation4);
   
   //load scene from file
   scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]), strecth);

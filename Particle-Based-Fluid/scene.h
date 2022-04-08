@@ -464,7 +464,7 @@ public:
   void updateScene(const double timeStep, const double CRCoeff, const double tolerance, const int maxIterations){
       
     //integrating velocity, position and orientation from forces and previous states
-    omp_set_num_threads(omp_get_max_threads());
+    //omp_set_num_threads(omp_get_max_threads());
 #pragma omp parallel for 
     for (int i=0;i<meshes.size();i++)
       meshes[i].integrate(timeStep);
@@ -474,7 +474,7 @@ public:
     //This is done exhaustively: checking every two objects in the scene.
     double depth;
     RowVector3d contactNormal, penPosition;
-    omp_set_num_threads(omp_get_max_threads());
+    //omp_set_num_threads(omp_get_max_threads());
 
 
     for (int i=0;i<meshes.size();i++)
