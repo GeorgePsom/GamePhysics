@@ -541,6 +541,9 @@ public:
     vector<double> Densities(meshes.size());
     vector<double> Lambdas(meshes.size());
     vector<RowVector3d> DeltaPs(meshes.size());
+    vector<RowVector3d> Curls(meshes.size());
+    vector<RowVector3d> Vorticities(meshes.size());
+    vector<RowVector3d> Viscocities(meshes.size());
     for (int iter = 0; iter < N; iter++)
     {
         //estimate density
@@ -600,6 +603,25 @@ public:
 
         }
 #pragma omp barrier
+
+        // Compute Curls
+#pragma omp parallel for
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            if (meshes[i].isFixed)
+                continue;
+            Curls[i] = RowVector3d::Zero();
+            for (int j = 0; j < meshes.size(); j++)
+            {
+                if (i == j || meshes[j].isFixed)
+                    continue;
+                RowVector3d Vel12 = meshes[i].comVelocity - meshes[j].comVelocity;
+                RowVector3d gradient = spiky(meshes[i].COM - meshes[j].COM, smoothingRadius);
+                Curls[i] += Vel12.cross(gradient);
+            }
+        }
+#pragma omp barrier
+
 #pragma omp parallel for 
         // Compute Dp
         for (int i = 0; i < meshes.size(); i++)
@@ -607,6 +629,8 @@ public:
             if (meshes[i].isFixed)
                 continue;
             DeltaPs[i] = RowVector3d::Zero();
+            Vorticities[i] = RowVector3d::Zero();
+            Viscocities[i] = RowVector3d::Zero();
             double lambda_i = Lambdas[i];
             for (int j = 0; j < meshes.size(); j++)
             {
@@ -626,7 +650,26 @@ public:
                 double nd2 = nd * nd;
                 double s_corr = -artificialPressureK * pow(nd, artificialPressureK);
                 DeltaPs[i] += (lambda_i + Lambdas[j] + s_corr) * gradient;
+
+                RowVector3d curl_ij = Curls[i] - Curls[j];
+                double omegaBar = curl_ij.norm();
+                Vorticities[i] += RowVector3d(omegaBar / r.x(), omegaBar / r.y(), omegaBar / r.z());
+                
+                RowVector3d Vel12 = meshes[i].comVelocity - meshes[j].comVelocity;
+                double W_ij = poly6(r, smoothingRadius);
+                Viscocities[i] += W_ij * Vel12;
+
             }
+
+            double n = Vorticities[i].norm();
+            RowVector3d N = RowVector3d::Zero();
+            if (n > EPSILON)
+                N = Vorticities[i].normalized();
+            RowVector3d f_curl = vorticity * N.cross(Curls[i]);
+            Vorticities[i] = timeStep * f_curl;
+            Viscocities[i] *= viscocity;
+
+            
 
         }
 #pragma omp barrier
@@ -646,7 +689,7 @@ public:
     {
         if (meshes[i].isFixed)
             continue;
-        meshes[i].comVelocity = 1.0 / 0.02 * (meshes[i].COM - meshes[i].COMprevious);
+        meshes[i].comVelocity = 1.0 / 0.02 * (meshes[i].COM - meshes[i].COMprevious) + Viscocities[i] + Vorticities[i];
 
         for (int j = 0; j < meshes[i].currV.rows(); j++)
         {
@@ -807,9 +850,9 @@ public:
       //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
       for (int k = 0; k < 15; k++)
       {
-          for (int j = 0; j <7 - k/2; j++)
+          for (int j = 0; j <7 - k/2 - 1; j++)
           {
-              for (int i = 0; i < 7 -k/2; i++)
+              for (int i = 0; i < 7 -k/2 - 1; i++)
               {
                   RowVector3d com;
                   com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;
