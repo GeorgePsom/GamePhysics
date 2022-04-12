@@ -43,6 +43,7 @@ public:
   //position of object in space. We must always have that currV = QRot(origV, orientation)+ COM
   RowVector4d orientation; //current orientation
   RowVector3d COM;  //current center of mass
+  RowVector3d COMprevious;
   Matrix3d invIT;  //Original *inverse* inertia tensor around the COM, defined in the rest state to the object (so to the canonical world system)
   
   VectorXd tetVolumes;    //|T|x1 tetrahedra volumes
@@ -158,7 +159,7 @@ public:
     /********
      TODO: complete from Practical 1
      *******/
-    
+    COMprevious = COM;
     COM += comVelocity * timeStep;
 
     RowVector3d normAng = angVelocity;
@@ -245,6 +246,7 @@ public:
 
     Vector3d gravity; gravity << 0, -9.8, 0.0;
     comVelocity += (gravity * timeStep);
+    //std::cout << totalMass << std::endl;
     //comVelocity -= comVelocity * dragCoeff * timeStep;
     //angVelocity -= (angVelocity * timeStep * dragCoeff);
   }
@@ -311,7 +313,47 @@ public:
   double currTime = 0.0;
   int numFullV, numFullT;
   std::vector<Mesh> meshes;
-  
+  const double EPSILON = 1.0e-4f;
+
+  double poly6(RowVector3d r, double h)
+  {
+      double rBar = r.norm();
+
+      if (rBar < EPSILON || rBar > h) {
+          return 0.0f;
+      }
+
+      // (315 / (64 * PI * h^9)) * (h^2 - |r|^2)^3
+      double h9 = (h * h * h * h * h * h * h * h * h);
+      if (h9 < EPSILON) {
+          return 0.0f;
+      }
+      double A = 1.566681471061f / h9;
+      double B = (h * h) - (rBar * rBar);
+
+      return A * (B * B * B);
+  }
+
+  RowVector3d spiky(RowVector3d r, double h)
+  {
+      double rBar = r.norm();
+
+      if (rBar < EPSILON || rBar > h) { 
+          return RowVector3d::Zero();
+      }
+
+      // (45 / (PI * h^6)) * (h - |r|)^2 * (r / |r|)
+      double h6 = (h * h * h * h * h * h);
+      if (h6 < EPSILON) {
+          return RowVector3d::Zero();
+      }
+      double A = 14.323944878271f / h6;
+      double B = (h - rBar);
+      RowVector3d out = A * (B * B) * (r / (rBar + EPSILON));
+      //out[3] = 0.0f;
+      return out;
+  }
+
   //Practical 2
   vector<Constraint> constraints;   //The (user) constraints of the scene
   
@@ -483,104 +525,234 @@ public:
           handleCollision(meshes[i], meshes[j],depth, contactNormal, penPosition,CRCoeff, tolerance);
     
     
-    //Resolving user constraints iteratively until either:
-    //1. Positions or velocities are valid up to tolerance (a full streak of validity in the iteration)
-    //2. maxIterations has run out
-    
-    
-    //Resolving velocity
-    int currIteration=0;
-    int zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.currVertexPositions
-    int currConstIndex=0;
-    while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
-      
-      Constraint currConstraint=constraints[currConstIndex];
-      
-      RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
-      RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
-      
-      RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
-      RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
-      //cout<<"(currConstPos1-currConstPos2).norm(): "<<(currConstPos1-currConstPos2).norm()<<endl;
-      //cout<<"(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm(): "<<(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm()<<endl;
-      MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
-      MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
-      MatrixXd currCOMVelocities(2,3); currCOMVelocities<<meshes[currConstraint.m1].comVelocity, meshes[currConstraint.m2].comVelocity;
-      MatrixXd currAngVelocities(2,3); currAngVelocities<<meshes[currConstraint.m1].angVelocity, meshes[currConstraint.m2].angVelocity;
-      
-      Matrix3d invInertiaTensor1=meshes[currConstraint.m1].getCurrInvInertiaTensor();
-      Matrix3d invInertiaTensor2=meshes[currConstraint.m2].getCurrInvInertiaTensor();
-      MatrixXd correctedCOMVelocities = MatrixXd::Zero(2, 3);
-      MatrixXd correctedAngVelocities = MatrixXd::Zero(2, 3);
-      
-      
-      bool velocityWasValid=currConstraint.resolveVelocityConstraint(currCOMPositions, currConstPositions, currCOMVelocities, currAngVelocities, invInertiaTensor1, invInertiaTensor2, correctedCOMVelocities,correctedAngVelocities, tolerance);
-      
-      if (velocityWasValid){
-        zeroStreak++;
-      }else{
-        //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
-        zeroStreak=0;
-        meshes[currConstraint.m1].comVelocity =correctedCOMVelocities.row(0);
-        meshes[currConstraint.m2].comVelocity =correctedCOMVelocities.row(1);
-        
-        meshes[currConstraint.m1].angVelocity =correctedAngVelocities.row(0);
-        meshes[currConstraint.m2].angVelocity =correctedAngVelocities.row(1);
-        
-      }
-      
-      currIteration++;
-      currConstIndex=(currConstIndex+1)%(constraints.size());
-    }
-    
-    if (currIteration*constraints.size()>=maxIterations)
-      cout<<"Velocity Constraint resolution reached maxIterations without resolving!"<<endl;
-    
-    
-    //Resolving position
-    currIteration=0;
-    zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.
-    currConstIndex=0;
-    while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
-      
-      Constraint currConstraint=constraints[currConstIndex];
-      
-      RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
-      RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
-      
-      RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
-      RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
 
-      MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
-      MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
-    
-      MatrixXd correctedCOMPositions = MatrixXd::Zero(2, 3);
-    
-      bool positionWasValid=currConstraint.resolvePositionConstraint(currCOMPositions, currConstPositions,correctedCOMPositions, tolerance);
-      
-      if (positionWasValid){
-        zeroStreak++;
-      }else{
-        //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
-        zeroStreak=0;
+    const int N = 3;
+    const double REST_DENSITY = 37.76;
+    const double INV_REST_DENSITY = 1.0f / REST_DENSITY;
+    const double particlesRadius = 9.375;
+    const double smoothingRadius = 20.0;
+    const double relaxation = 0.0033;
+    const double artificialPressureK = 10.99;
+    const double artificalPressureN = 10.0;
+    const double vorticity = 0.1;
+    const double viscocity = 0.01;
 
-        meshes[currConstraint.m1].COM =correctedCOMPositions.row(0);
-        meshes[currConstraint.m2].COM =correctedCOMPositions.row(1);
-        
-      }
-      
-      currIteration++;
-      currConstIndex=(currConstIndex+1)%(constraints.size());
+    
+    vector<double> Densities(meshes.size());
+    vector<double> Lambdas(meshes.size());
+    vector<RowVector3d> DeltaPs(meshes.size());
+    for (int iter = 0; iter < N; iter++)
+    {
+        //estimate density
+ omp_set_num_threads(omp_get_max_threads());
+#pragma omp parallel for 
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            Densities[i] = 0;
+            if (meshes[i].isFixed)
+                continue;
+
+            for (int j = 0; j < meshes.size(); j++)
+            {
+                if (meshes[j].isFixed || i == j)
+                    continue;
+                Densities[i] += poly6(meshes[i].COM - meshes[j].COM, smoothingRadius);
+            }
+                
+        }
+#pragma omp barrier
+
+
+#pragma omp parallel for 
+        // Compute Lambda
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            if (meshes[i].isFixed)
+                continue;
+            double C_i = Densities[i] * INV_REST_DENSITY - 1.0;
+            double gradientS = 0.0;
+
+            RowVector3d gv_i;
+            gv_i << 0.0, 0.0, 0.0;
+            for (int j = 0; j < meshes.size(); j++)
+            {
+                if (meshes[j].isFixed || i == j)
+                    continue;
+                gv_i += spiky(meshes[i].COM - meshes[j].COM, smoothingRadius);
+            }
+            double gv_iLen = INV_REST_DENSITY * gv_i.norm();
+            gradientS += gv_iLen * gv_iLen;
+
+            double gv_sLengths = 0.0;
+            
+            for (int j = 0; j < meshes.size(); j++)
+            {
+                if (meshes[j].isFixed || i == j)\
+                    continue;
+                RowVector3d gradVector = -spiky(meshes[i].COM - meshes[j].COM, smoothingRadius) * INV_REST_DENSITY;
+                double gradVectorL = gradVector.norm();
+                gv_sLengths += gradVectorL;
+            }
+            gradientS += gv_sLengths;
+            if (gradientS == 0.0)
+                gradientS == EPSILON;
+            Lambdas[i] = -C_i / (gradientS + relaxation);
+
+        }
+#pragma omp barrier
+#pragma omp parallel for 
+        // Compute Dp
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            if (meshes[i].isFixed)
+                continue;
+            DeltaPs[i] = RowVector3d::Zero();
+            double lambda_i = Lambdas[i];
+            for (int j = 0; j < meshes.size(); j++)
+            {
+                if (i == j || meshes[j].isFixed)
+                    continue;
+                // Artificial Pressure Corrector
+                double h = smoothingRadius;
+                RowVector3d r = meshes[i].COM - meshes[j].COM;
+                RowVector3d gradient = spiky(r, h);
+                double n = poly6(r, h);
+
+                double offset = (0.3f * h);
+                RowVector3d deltaQ = meshes[i].COM + RowVector3d(offset, offset, offset);
+                double d = poly6(deltaQ, h);
+                double nd = abs(d) <= EPSILON ? 0.0f : n / d;
+
+                double nd2 = nd * nd;
+                double s_corr = -artificialPressureK * pow(nd, artificialPressureK);
+                DeltaPs[i] += (lambda_i + Lambdas[j] + s_corr) * gradient;
+            }
+
+        }
+#pragma omp barrier
+
+#pragma omp parallel for 
+        for (int i = 0; i < meshes.size(); i++)
+        {
+            if (meshes[i].isFixed)
+                continue;
+            meshes[i].COM += DeltaPs[i];
+        }
+#pragma omp barrier
     }
-    
-    if (currIteration*constraints.size()>=maxIterations)
-      cout<<"Position Constraint resolution reached maxIterations without resolving!"<<endl;
-    
-    
-    //updating currV according to corrected COM
-    for (int i=0;i<meshes.size();i++)
-      for (int j=0;j<meshes[i].currV.rows();j++)
-        meshes[i].currV.row(j)<<QRot(meshes[i].origV.row(j), meshes[i].orientation)+meshes[i].COM;
+//
+#pragma omp parallel for 
+    for (int i = 0; i < meshes.size(); i++)
+    {
+        if (meshes[i].isFixed)
+            continue;
+        meshes[i].comVelocity = 1.0 / 0.02 * (meshes[i].COM - meshes[i].COMprevious);
+
+        for (int j = 0; j < meshes[i].currV.rows(); j++)
+        {
+            meshes[i].currV.row(j) += DeltaPs[i];
+        }
+    }
+#pragma omp barrier
+
+    ////Resolving user constraints iteratively until either:
+    ////1. Positions or velocities are valid up to tolerance (a full streak of validity in the iteration)
+    ////2. maxIterations has run out
+    //
+    //
+    ////Resolving velocity
+    //int currIteration=0;
+    //int zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.currVertexPositions
+    //int currConstIndex=0;
+    //while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
+    //  
+    //  Constraint currConstraint=constraints[currConstIndex];
+    //  
+    //  RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
+    //  RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
+    //  
+    //  RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
+    //  RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
+    //  //cout<<"(currConstPos1-currConstPos2).norm(): "<<(currConstPos1-currConstPos2).norm()<<endl;
+    //  //cout<<"(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm(): "<<(meshes[currConstraint.m1].currV.row(currConstraint.v1)-meshes[currConstraint.m2].currV.row(currConstraint.v2)).norm()<<endl;
+    //  MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
+    //  MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
+    //  MatrixXd currCOMVelocities(2,3); currCOMVelocities<<meshes[currConstraint.m1].comVelocity, meshes[currConstraint.m2].comVelocity;
+    //  MatrixXd currAngVelocities(2,3); currAngVelocities<<meshes[currConstraint.m1].angVelocity, meshes[currConstraint.m2].angVelocity;
+    //  
+    //  Matrix3d invInertiaTensor1=meshes[currConstraint.m1].getCurrInvInertiaTensor();
+    //  Matrix3d invInertiaTensor2=meshes[currConstraint.m2].getCurrInvInertiaTensor();
+    //  MatrixXd correctedCOMVelocities = MatrixXd::Zero(2, 3);
+    //  MatrixXd correctedAngVelocities = MatrixXd::Zero(2, 3);
+    //  
+    //  
+    //  bool velocityWasValid=currConstraint.resolveVelocityConstraint(currCOMPositions, currConstPositions, currCOMVelocities, currAngVelocities, invInertiaTensor1, invInertiaTensor2, correctedCOMVelocities,correctedAngVelocities, tolerance);
+    //  
+    //  if (velocityWasValid){
+    //    zeroStreak++;
+    //  }else{
+    //    //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
+    //    zeroStreak=0;
+    //    meshes[currConstraint.m1].comVelocity =correctedCOMVelocities.row(0);
+    //    meshes[currConstraint.m2].comVelocity =correctedCOMVelocities.row(1);
+    //    
+    //    meshes[currConstraint.m1].angVelocity =correctedAngVelocities.row(0);
+    //    meshes[currConstraint.m2].angVelocity =correctedAngVelocities.row(1);
+    //    
+    //  }
+    //  
+    //  currIteration++;
+    //  currConstIndex=(currConstIndex+1)%(constraints.size());
+    //}
+    //
+    //if (currIteration*constraints.size()>=maxIterations)
+    //  cout<<"Velocity Constraint resolution reached maxIterations without resolving!"<<endl;
+    //
+    //
+    ////Resolving position
+    //currIteration=0;
+    //zeroStreak=0;  //how many consecutive constraints are already below tolerance without any change; the algorithm stops if all are.
+    //currConstIndex=0;
+    //while ((zeroStreak<constraints.size())&&(currIteration*constraints.size()<maxIterations)){
+    //  
+    //  Constraint currConstraint=constraints[currConstIndex];
+    //  
+    //  RowVector3d origConstPos1=meshes[currConstraint.m1].origV.row(currConstraint.v1);
+    //  RowVector3d origConstPos2=meshes[currConstraint.m2].origV.row(currConstraint.v2);
+    //  
+    //  RowVector3d currConstPos1 = QRot(origConstPos1, meshes[currConstraint.m1].orientation)+meshes[currConstraint.m1].COM;
+    //  RowVector3d currConstPos2 = QRot(origConstPos2, meshes[currConstraint.m2].orientation)+meshes[currConstraint.m2].COM;
+
+    //  MatrixXd currCOMPositions(2,3); currCOMPositions<<meshes[currConstraint.m1].COM, meshes[currConstraint.m2].COM;
+    //  MatrixXd currConstPositions(2,3); currConstPositions<<currConstPos1, currConstPos2;
+    //
+    //  MatrixXd correctedCOMPositions = MatrixXd::Zero(2, 3);
+    //
+    //  bool positionWasValid=currConstraint.resolvePositionConstraint(currCOMPositions, currConstPositions,correctedCOMPositions, tolerance);
+    //  
+    //  if (positionWasValid){
+    //    zeroStreak++;
+    //  }else{
+    //    //only update the COM and angular velocity, don't both updating all currV because it might change again during this loop!
+    //    zeroStreak=0;
+
+    //    meshes[currConstraint.m1].COM =correctedCOMPositions.row(0);
+    //    meshes[currConstraint.m2].COM =correctedCOMPositions.row(1);
+    //    
+    //  }
+    //  
+    //  currIteration++;
+    //  currConstIndex=(currConstIndex+1)%(constraints.size());
+    //}
+    //
+    //if (currIteration*constraints.size()>=maxIterations)
+    //  cout<<"Position Constraint resolution reached maxIterations without resolving!"<<endl;
+    //
+    //
+    ////updating currV according to corrected COM
+    //for (int i=0;i<meshes.size();i++)
+    //  for (int j=0;j<meshes[i].currV.rows();j++)
+    //    meshes[i].currV.row(j)<<QRot(meshes[i].origV.row(j), meshes[i].orientation)+meshes[i].COM;
     
     currTime+=timeStep;
   }
@@ -633,11 +805,11 @@ public:
 
       
       //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
-      for (int k = 0; k < 7; k++)
+      for (int k = 0; k < 15; k++)
       {
-          for (int j = 0; j < k+1; j++)
+          for (int j = 0; j <7 - k/2; j++)
           {
-              for (int i = 0; i < k+1; i++)
+              for (int i = 0; i < 7 -k/2; i++)
               {
                   RowVector3d com;
                   com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;

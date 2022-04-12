@@ -15,7 +15,7 @@ float currTime = 0;
 bool animationHack;  //fixing the weird camera bug in libigl
 //initial values
 float timeStep = 0.02;
-float CRCoeff= 1.0;
+float CRCoeff= 0.1;
 bool strecth = false;
 
 double tolerance = 10e-3;
@@ -253,7 +253,7 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
   viewer.data_list[4].show_lines = false;
   viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
   viewer.data_list[4].set_face_based(true);
-  viewer.data_list[4].set_visible(platVisibility);
+  viewer.data_list[4].set_visible(false);
   //viewer.core.align_camera_center(scene.meshes[0].currV);
   
   //updating constraint viewing
