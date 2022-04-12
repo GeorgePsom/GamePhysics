@@ -269,6 +269,8 @@ public:
     orientation=_orientation;
     comVelocity.setZero();
     angVelocity.setZero();
+
+    COMprevious = COM;
     
     RowVector3d naturalCOM;  //by the geometry of the object
     
@@ -503,7 +505,7 @@ public:
    
    You do not need to update this function in Practical 2
    *********************************************************************/
-  void updateScene(const double timeStep, const double CRCoeff, const double tolerance, const int maxIterations){
+  void updateScene(const double timeStep, const double CRCoeff, const double tolerance, const int maxIterations, vector<vector<RowVector3d>>& dataArray){
       
     //integrating velocity, position and orientation from forces and previous states
     //omp_set_num_threads(omp_get_max_threads());
@@ -753,6 +755,14 @@ public:
     //for (int i=0;i<meshes.size();i++)
     //  for (int j=0;j<meshes[i].currV.rows();j++)
     //    meshes[i].currV.row(j)<<QRot(meshes[i].origV.row(j), meshes[i].orientation)+meshes[i].COM;
+
+    int index = currTime / timeStep;
+
+    if (currTime == 0) index = 0;
+
+    for (int i = 0; i < meshes.size(); i++) {
+        dataArray[index][i] = meshes[i].COM;
+    }
     
     currTime+=timeStep;
   }
@@ -805,11 +815,11 @@ public:
 
       
       //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
-      for (int k = 0; k < 15; k++)
+      for (int k = 0; k < 30; k++)
       {
-          for (int j = 0; j <7 - k/2; j++)
+          for (int j = 0; j <15 - k/2; j++)
           {
-              for (int i = 0; i < 7 -k/2; i++)
+              for (int i = 0; i < 15 -k/2; i++)
               {
                   RowVector3d com;
                   com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;

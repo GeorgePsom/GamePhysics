@@ -17,9 +17,12 @@ bool animationHack;  //fixing the weird camera bug in libigl
 float timeStep = 0.02;
 float CRCoeff= 0.1;
 bool strecth = false;
+int frameNum = 3000;
 
 double tolerance = 10e-3;
 int maxIterations=10000;
+
+bool offline = true;
 
 bool platVisibility = true;
 
@@ -55,9 +58,11 @@ Eigen::MatrixXi platT4;
 Eigen::RowVector3d platCOM4;
 Eigen::RowVector4d platOrientation4;
 
+vector<vector<RowVector3d>> dataArray;
+
 void createPlatform()
 {
-  double platWidth=200.0;
+  double platWidth=450.0;
   platCOM<<0.0, -platWidth, 0.0;
   platV.resize(9,3);
   platF.resize(12,3);
@@ -66,11 +71,11 @@ void createPlatform()
   -platWidth,0.0,platWidth,
   platWidth,0.0,platWidth,
   platWidth,0.0, -platWidth,
-  -platWidth,-platWidth/10.0,-platWidth,
-  -platWidth,-platWidth/10.0,platWidth,
-  platWidth,-platWidth/10.0,platWidth,
-  platWidth,-platWidth/10.0, -platWidth,
-  0.0,-platWidth/20.0, 0.0;
+  -platWidth,-platWidth/20.0,-platWidth,
+  -platWidth,-platWidth/20.0,platWidth,
+  platWidth,-platWidth/20.0,platWidth,
+  platWidth,-platWidth/20.0, -platWidth,
+  0.0,-platWidth/40.0, 0.0;
   platF<<0,1,2,
   2,3,0,
   6,5,4,
@@ -279,6 +284,81 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
   
 }
 
+
+void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
+{
+    RowVector3d platColor; platColor << 0.8, 0.8, 0.8;
+    RowVector3d meshColor; meshColor << 0.8, 0.2, 0.2;
+
+    int index = currTime / timeStep;
+    
+    for (int i = 5; i < scene.meshes.size(); i++) {
+        for (int j = 0; j < scene.meshes[i].currV.rows(); j++)
+        {
+            scene.meshes[i].currV.row(j) << scene.meshes[i].origV.row(j) + dataArray[index][i];
+        }
+    }
+
+    viewer.core().align_camera_center(scene.meshes[0].currV);
+    for (int i = 0; i < scene.meshes.size(); i++) {
+        viewer.data_list[i].clear();
+        viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
+        viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
+        viewer.data_list[i].set_face_based(true);
+        viewer.data_list[i].set_colors(meshColor);
+        viewer.data_list[i].show_lines = false;
+    }
+    viewer.data_list[0].show_lines = false;
+    viewer.data_list[0].set_colors(platColor.replicate(scene.meshes[0].F.rows(), 1));
+    //viewer.data_list[0].set_colors(transparentColor);
+    viewer.data_list[0].set_face_based(true);
+    viewer.data_list[0].set_visible(platVisibility);
+
+    viewer.data_list[1].show_lines = false;
+    viewer.data_list[1].set_colors(platColor.replicate(scene.meshes[1].F.rows(), 1));
+    viewer.data_list[1].set_face_based(true);
+    viewer.data_list[1].set_visible(platVisibility);
+
+    viewer.data_list[2].show_lines = false;
+    viewer.data_list[2].set_colors(platColor.replicate(scene.meshes[2].F.rows(), 1));
+    viewer.data_list[2].set_face_based(true);
+    viewer.data_list[2].set_visible(platVisibility);
+
+    viewer.data_list[3].show_lines = false;
+    viewer.data_list[3].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
+    viewer.data_list[3].set_face_based(true);
+    viewer.data_list[3].set_visible(platVisibility);
+
+    viewer.data_list[4].show_lines = false;
+    viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
+    viewer.data_list[4].set_face_based(true);
+    viewer.data_list[4].set_visible(false);
+    //viewer.core.align_camera_center(scene.meshes[0].currV);
+
+    //updating constraint viewing
+    MatrixXi constF;
+    MatrixXd constV, constC;
+
+    MatrixXd P1(scene.constraints.size(), 3);
+    MatrixXd P2(scene.constraints.size(), 3);
+    for (int i = 0; i < scene.constraints.size(); i++) {
+        P1.row(i) = scene.meshes[scene.constraints[i].m1].currV.row(scene.constraints[i].v1);
+        P2.row(i) = scene.meshes[scene.constraints[i].m2].currV.row(scene.constraints[i].v2);
+    }
+
+    MatrixXd cyndColors = RowVector3d(1.0, 1.0, 0.0).replicate(P1.size(), 1);
+
+    double radius = 0.5;
+    hedra::line_cylinders(P1, P2, radius, cyndColors, 8, constV, constF, constC);
+    viewer.data_list[scene.meshes.size()].set_mesh(constV, constF);
+    viewer.data_list[scene.meshes.size()].set_face_based(true);
+    viewer.data_list[scene.meshes.size()].set_colors(constC);
+    viewer.data_list[scene.meshes.size()].show_lines = false;
+
+
+}
+
+
 bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier)
 {
   if (key == ' ')
@@ -294,17 +374,16 @@ bool key_down(igl::opengl::glfw::Viewer &viewer, unsigned char key, int modifier
   if (key == 'S')
   {
     if (!viewer.core().is_animating){
-      scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations);
+      scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations, dataArray);
       currTime+=timeStep;
       updateMeshes(viewer);
       std::cout <<"currTime: "<<currTime<<std::endl;
       return true;
     }
   }
+
   return false;
 }
-
-
 
 
 bool pre_draw(igl::opengl::glfw::Viewer &viewer)
@@ -312,15 +391,30 @@ bool pre_draw(igl::opengl::glfw::Viewer &viewer)
   using namespace Eigen;
   using namespace std;
   
-  if (viewer.core().is_animating){
-    if (!animationHack)
-      scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations);
-    else
-      viewer.core().is_animating=false;
-    animationHack=false;
-    currTime+=timeStep;
-    //cout <<"currTime: "<<currTime<<endl;
-    updateMeshes(viewer);
+  if (offline == false) {
+      if (viewer.core().is_animating) {
+          if (!animationHack)
+              scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations, dataArray);
+          else
+              viewer.core().is_animating = false;
+          animationHack = false;
+          currTime += timeStep;
+          //cout <<"currTime: "<<currTime<<endl;
+          updateMeshes(viewer);
+      }
+  }
+  else {
+      if (viewer.core().is_animating) {
+          if (currTime / timeStep >= frameNum-2) {
+              currTime = 0;
+          }
+          else {
+              currTime += timeStep;
+              //cout << currTime << endl;
+          }
+          //cout <<"currTime: "<<currTime<<endl;
+          updateMeshesOffline(viewer);
+      }
   }
  
   
@@ -373,8 +467,22 @@ int main(int argc, char *argv[])
   //load scene from file
   scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]), strecth);
 
-  scene.updateScene(0.0, CRCoeff, tolerance, maxIterations);
   
+
+  dataArray = vector<vector<RowVector3d>>(frameNum, vector<RowVector3d>(scene.meshes.size(), { 0,0,0 }));
+
+  scene.updateScene(0.0, CRCoeff, tolerance, maxIterations, dataArray);
+
+  if (offline == true) {
+      for (int i = 0; i < frameNum; i++) {
+          scene.updateScene(timeStep, CRCoeff, tolerance, maxIterations, dataArray);
+          currTime += timeStep;
+          cout << currTime << endl;
+      }
+
+      currTime = 0;
+  }
+
   // Viewer Settings
   for (int i=0;i<scene.meshes.size();i++){
     if (i!=0)
