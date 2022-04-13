@@ -280,8 +280,18 @@ public:
     origV.rowwise()-=naturalCOM;  //removing the natural COM of the OFF file (natural COM is never used again)
     
     currV.resize(origV.rows(), origV.cols());
-    for (int i=0;i<currV.rows();i++)
-      currV.row(i)<<QRot(origV.row(i), orientation)+COM;
+    for (int i=0;i<currV.rows();i++){
+        if (!isFixed)
+        {
+            origV.row(i) *= 0.25;
+        }
+
+        if (density == 111) {
+            origV.row(i) *= 4.0;
+        }
+
+        currV.row(i)<<QRot(origV.row(i), orientation)+COM;
+    }
     
     
     VectorXi boundVMask(origV.rows());
@@ -531,11 +541,13 @@ public:
     const int N = 3;
     const double REST_DENSITY = 37.76;
     const double INV_REST_DENSITY = 1.0f / REST_DENSITY;
-    const double particlesRadius = 9.375;
-    const double smoothingRadius = 20.0;
+    const double particlesRadius = 2.34375;
+    const double smoothingRadius = 5.0;
+    //const double particlesRadius = 9.5;
+    //const double smoothingRadius = 20.0;
     const double relaxation = 0.0033;
-    const double artificialPressureK = 10.99;
-    const double artificalPressureN = 10.0;
+    const double artificialPressureK = 0.1;
+    const double artificalPressureN = 5;
     const double vorticity = 0.1;
     const double viscocity = 0.01;
 
@@ -546,7 +558,7 @@ public:
     for (int iter = 0; iter < N; iter++)
     {
         //estimate density
- omp_set_num_threads(omp_get_max_threads());
+omp_set_num_threads(omp_get_max_threads());
 #pragma omp parallel for 
         for (int i = 0; i < meshes.size(); i++)
         {
@@ -815,20 +827,28 @@ public:
 
       
       //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
-      for (int k = 0; k < 30; k++)
-      {
-          for (int j = 0; j <15 - k/2; j++)
+
+      if (i == 1) {
+          for (int k = 0; k < 10; k++)
           {
-              for (int i = 0; i < 15 -k/2; i++)
+              for (int j = 0; j < 5 - k / 2; j++)
               {
-                  RowVector3d com;
-                  com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;
-                  addMesh(objV, objF, objT, density, isFixed, com, userOrientation);
+                  for (int i = 0; i < 5 - k / 2; i++)
+                  {
+                      RowVector3d com;
+                      com << userCOM.x() + i * 8.0, userCOM.y() + 8.0 * k, userCOM.z() + 8.0 * j;
+                      //com << userCOM.x() + i * 25.0, userCOM.y() + 25.0 * k, userCOM.z() + 25.0 * j;
+                      addMesh(objV, objF, objT, density, isFixed, com, userOrientation);
+                  }
               }
           }
-             
-          
       }
+      else if (i==0) {
+          RowVector3d com;
+          com << userCOM.x(), userCOM.y()- 160.0 + 160 /20 + 30, userCOM.z();
+          addMesh(objV, objF, objT, density, isFixed, com, userOrientation);
+      }
+
       cout << "COM: " << userCOM <<endl;
       cout << "orientation: " << userOrientation <<endl;
     }

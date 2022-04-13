@@ -17,7 +17,7 @@ bool animationHack;  //fixing the weird camera bug in libigl
 float timeStep = 0.02;
 float CRCoeff= 0.1;
 bool strecth = false;
-int frameNum = 3000;
+int frameNum = 2000;
 
 double tolerance = 10e-3;
 int maxIterations=10000;
@@ -62,7 +62,7 @@ vector<vector<RowVector3d>> dataArray;
 
 void createPlatform()
 {
-  double platWidth=450.0;
+  double platWidth=160.0;
   platCOM<<0.0, -platWidth, 0.0;
   platV.resize(9,3);
   platF.resize(12,3);
@@ -71,11 +71,11 @@ void createPlatform()
   -platWidth,0.0,platWidth,
   platWidth,0.0,platWidth,
   platWidth,0.0, -platWidth,
-  -platWidth,-platWidth/20.0,-platWidth,
-  -platWidth,-platWidth/20.0,platWidth,
-  platWidth,-platWidth/20.0,platWidth,
-  platWidth,-platWidth/20.0, -platWidth,
-  0.0,-platWidth/40.0, 0.0;
+  -platWidth,-platWidth/10.0,-platWidth,
+  -platWidth,-platWidth/10.0,platWidth,
+  platWidth,-platWidth/10.0,platWidth,
+  platWidth,-platWidth/10.0, -platWidth,
+  0.0,-platWidth/20.0, 0.0;
   platF<<0,1,2,
   2,3,0,
   6,5,4,
@@ -289,15 +289,20 @@ void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
 {
     RowVector3d platColor; platColor << 0.8, 0.8, 0.8;
     RowVector3d meshColor; meshColor << 0.8, 0.2, 0.2;
+    RowVector3d bluemeshColor; bluemeshColor << 0.2, 0.2, 0.8;
+
+    omp_set_num_threads(omp_get_max_threads());
 
     int index = currTime / timeStep;
     
+#pragma cmp parallel for
     for (int i = 5; i < scene.meshes.size(); i++) {
         for (int j = 0; j < scene.meshes[i].currV.rows(); j++)
         {
             scene.meshes[i].currV.row(j) << scene.meshes[i].origV.row(j) + dataArray[index][i];
         }
     }
+#pragma cmp barrier
 
     viewer.core().align_camera_center(scene.meshes[0].currV);
     for (int i = 0; i < scene.meshes.size(); i++) {
@@ -305,7 +310,14 @@ void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
         viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
         viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
         viewer.data_list[i].set_face_based(true);
-        viewer.data_list[i].set_colors(meshColor);
+
+        if (i == 5) {
+            viewer.data_list[i].set_colors(meshColor);
+        }
+        else {
+            viewer.data_list[i].set_colors(bluemeshColor);
+        }
+
         viewer.data_list[i].show_lines = false;
     }
     viewer.data_list[0].show_lines = false;
