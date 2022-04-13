@@ -56,6 +56,8 @@ public:
   RowVector3d comVelocity;  //the linear velocity of the center of mass
   RowVector3d angVelocity;  //the angular velocity of the object.
 
+  double density;
+
   //checking collision between bounding boxes, and consequently the boundary tets if succeeds.
   //you do not need to update these functions (isBoxCollide and isCollide) unless you are doing a different collision
   
@@ -164,6 +166,8 @@ public:
 
     RowVector3d normAng = angVelocity;
 
+    
+
     //std::cout << "Angular: " << angVelocity << std::endl;
     //std::cout << "Norm angular: " << normAng << std::endl;
 
@@ -171,6 +175,8 @@ public:
 
     orientation += 0.5 * timeStep * QMult(q, orientation);
     orientation.normalize();
+
+
 
     for (int i = 0; i < currV.rows(); i++)
     {
@@ -260,7 +266,7 @@ public:
   }
   
   
-  Mesh(const MatrixXd& _V, const MatrixXi& _F, const MatrixXi& _T, const double density, const bool _isFixed, const RowVector3d& _COM, const RowVector4d& _orientation){
+  Mesh(const MatrixXd& _V, const MatrixXi& _F, const MatrixXi& _T, const double _density, const bool _isFixed, const RowVector3d& _COM, const RowVector4d& _orientation){
     origV=_V;
     F=_F;
     T=_T;
@@ -269,7 +275,7 @@ public:
     orientation=_orientation;
     comVelocity.setZero();
     angVelocity.setZero();
-
+    density = _density;
     COMprevious = COM;
     
     RowVector3d naturalCOM;  //by the geometry of the object
@@ -510,8 +516,23 @@ public:
     //integrating velocity, position and orientation from forces and previous states
     //omp_set_num_threads(omp_get_max_threads());
 #pragma omp parallel for 
-    for (int i=0;i<meshes.size();i++)
-      meshes[i].integrate(timeStep);
+      for (int i = 0; i < meshes.size(); i++) {
+
+          /*if (meshes[i].density > 110.0 && meshes[i].density < 112.0) {
+              RowVector3d normAng = {0 , 0.01, 0};
+              RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
+
+              meshes[i].orientation += 0.5 * timeStep * QMult(q, meshes[i].orientation);
+              meshes[i].orientation.normalize();
+
+              for (int j = 0; j < meshes[i].currV.rows(); j++)
+              {
+                  meshes[i].currV.row(j) << QRot(meshes[i].origV.row(j), meshes[i].orientation) + meshes[i].COM;
+              }
+          }*/
+
+          meshes[i].integrate(timeStep);
+      }
 #pragma omp barrier
 
     //detecting and handling collisions when found
@@ -815,11 +836,11 @@ public:
 
       
       //addMesh(objV,objF, objT,density, isFixed, userCOM, userOrientation);
-      for (int k = 0; k < 30; k++)
+      for (int k = 0; k < 20; k++)
       {
-          for (int j = 0; j <15 - k/2; j++)
+          for (int j = 0; j <10 - k/2; j++)
           {
-              for (int i = 0; i < 15 -k/2; i++)
+              for (int i = 0; i < 10 - k/2; i++)
               {
                   RowVector3d com;
                   com << userCOM.x() + i * 25.0, userCOM.y()+ 25.0* k, userCOM.z() + 25.0 * j;

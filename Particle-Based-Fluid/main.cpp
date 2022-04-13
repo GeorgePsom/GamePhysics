@@ -17,7 +17,9 @@ bool animationHack;  //fixing the weird camera bug in libigl
 float timeStep = 0.02;
 float CRCoeff= 0.1;
 bool strecth = false;
-int frameNum = 3000;
+int frameNum = 1000;
+
+bool withObject = true;
 
 double tolerance = 10e-3;
 int maxIterations=10000;
@@ -58,12 +60,18 @@ Eigen::MatrixXi platT4;
 Eigen::RowVector3d platCOM4;
 Eigen::RowVector4d platOrientation4;
 
+Eigen::MatrixXd platV5;
+Eigen::MatrixXi platF5;
+Eigen::MatrixXi platT5;
+Eigen::RowVector3d platCOM5;
+Eigen::RowVector4d platOrientation5;
+
 vector<vector<RowVector3d>> dataArray;
 
 void createPlatform()
 {
-  double platWidth=450.0;
-  platCOM<<0.0, -platWidth, 0.0;
+  double platWidth=270.0;
+  platCOM<<0.0, -platWidth+platWidth/20.0, 0.0;
   platV.resize(9,3);
   platF.resize(12,3);
   platT.resize(12,4);
@@ -71,11 +79,11 @@ void createPlatform()
   -platWidth,0.0,platWidth,
   platWidth,0.0,platWidth,
   platWidth,0.0, -platWidth,
-  -platWidth,-platWidth/20.0,-platWidth,
-  -platWidth,-platWidth/20.0,platWidth,
-  platWidth,-platWidth/20.0,platWidth,
-  platWidth,-platWidth/20.0, -platWidth,
-  0.0,-platWidth/40.0, 0.0;
+  -platWidth,-platWidth/10.0,-platWidth,
+  -platWidth,-platWidth/10.0,platWidth,
+  platWidth,-platWidth/10.0,platWidth,
+  platWidth,-platWidth/10.0, -platWidth,
+  0.0,-platWidth/20.0, 0.0;
   platF<<0,1,2,
   2,3,0,
   6,5,4,
@@ -95,6 +103,7 @@ void createPlatform()
 
 
   platCOM1 << platWidth- platWidth / 20.0, platWidth / 20.0, 0.0;
+  //platCOM1 << platWidth, platWidth / 20.0, 0.0;
   platV1.resize(9, 3);
   platF1.resize(12, 3);
   platT1.resize(12, 4);
@@ -127,6 +136,7 @@ void createPlatform()
 
 
   platCOM2 << 0.0, platWidth / 20.0, platWidth- platWidth / 20.0;
+  //platCOM2 << 0.0, platWidth / 20.0, platWidth;
   platV2.resize(9, 3);
   platF2.resize(12, 3);
   platT2.resize(12, 4);
@@ -159,6 +169,7 @@ void createPlatform()
 
 
   platCOM3 << -platWidth+ platWidth / 20.0, platWidth / 20.0, 0.0;
+  //platCOM3 << -platWidth, platWidth / 20.0, 0.0;
   platV3.resize(9, 3);
   platF3.resize(12, 3);
   platT3.resize(12, 4);
@@ -189,6 +200,7 @@ void createPlatform()
   platT3 << platF3, VectorXi::Constant(12, 8);
 
   platCOM4 << 0.0, platWidth / 20.0, -platWidth + platWidth / 20.0;
+  //platCOM4 << 0.0, platWidth / 20.0, -platWidth;
   platV4.resize(9, 3);
   platF4.resize(12, 3);
   platT4.resize(12, 4);
@@ -217,6 +229,39 @@ void createPlatform()
   platOrientation4 << 0.0, 0.0, 1.0, 1.0;
 
   platT4 << platF4, VectorXi::Constant(12, 8);
+
+
+  int cubeWidth = 70;
+  platCOM5 << -50.0,-platWidth + platWidth/20 + 60, -100.0;
+  //platCOM4 << 0.0, platWidth / 20.0, -platWidth;
+  platV5.resize(9, 3);
+  platF5.resize(12, 3);
+  platT5.resize(12, 4);
+  platV5 << -cubeWidth, 0.0, -cubeWidth,
+      -cubeWidth, 0.0, cubeWidth,
+      cubeWidth, 0.0, cubeWidth,
+      cubeWidth, 0.0, -cubeWidth,
+      -cubeWidth, -cubeWidth , -cubeWidth,
+      -cubeWidth, -cubeWidth , cubeWidth,
+      cubeWidth, -cubeWidth , cubeWidth,
+      cubeWidth, -cubeWidth , -cubeWidth,
+      0.0, -cubeWidth , 0.0;
+  platF5 << 0, 1, 2,
+      2, 3, 0,
+      6, 5, 4,
+      4, 7, 6,
+      1, 0, 5,
+      0, 4, 5,
+      2, 1, 6,
+      1, 5, 6,
+      3, 2, 7,
+      2, 6, 7,
+      0, 3, 4,
+      3, 7, 4;
+
+  platOrientation5 << 0.0, 0.0, 1.8, 0.6;
+
+  platT5 << platF5, VectorXi::Constant(12, 8);
   
   
 }
@@ -225,13 +270,20 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
 {
   RowVector3d platColor; platColor<<0.8,0.8,0.8;
   RowVector3d meshColor; meshColor<<0.8,0.2,0.2;
+  RowVector3d bluemeshColor; bluemeshColor << 0.2, 0.2, 0.8;
+
   //RowVector3d transparentColor; transparentColor << 0.8, 0.2, 0.2, 0.0;
   viewer.core().align_camera_center(scene.meshes[0].currV);
   for (int i=0;i<scene.meshes.size();i++){
     viewer.data_list[i].clear();
     viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
     viewer.data_list[i].set_face_based(true);
-    viewer.data_list[i].set_colors(meshColor);
+    if (i > 5) {
+        viewer.data_list[i].set_colors(bluemeshColor);
+    }
+    else {
+        viewer.data_list[i].set_colors(meshColor);
+    }
     viewer.data_list[i].show_lines=false;
   }
   viewer.data_list[0].show_lines=false;
@@ -253,12 +305,19 @@ void updateMeshes(igl::opengl::glfw::Viewer &viewer)
   viewer.data_list[3].show_lines = false;
   viewer.data_list[3].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
   viewer.data_list[3].set_face_based(true);
-  viewer.data_list[3].set_visible(platVisibility);
+  viewer.data_list[3].set_visible(false);
 
   viewer.data_list[4].show_lines = false;
   viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
   viewer.data_list[4].set_face_based(true);
   viewer.data_list[4].set_visible(false);
+
+  if (withObject == true) {
+      viewer.data_list[5].show_lines = false;
+      viewer.data_list[5].set_colors(meshColor);
+      viewer.data_list[5].set_face_based(true);
+      viewer.data_list[5].set_visible(true);
+  }
   //viewer.core.align_camera_center(scene.meshes[0].currV);
   
   //updating constraint viewing
@@ -289,14 +348,36 @@ void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
 {
     RowVector3d platColor; platColor << 0.8, 0.8, 0.8;
     RowVector3d meshColor; meshColor << 0.8, 0.2, 0.2;
+    RowVector3d bluemeshColor; bluemeshColor << 0.2, 0.2, 0.8;
+
+    omp_set_num_threads(omp_get_max_threads());
 
     int index = currTime / timeStep;
-    
+
+#pragma omp parallel for
     for (int i = 5; i < scene.meshes.size(); i++) {
         for (int j = 0; j < scene.meshes[i].currV.rows(); j++)
         {
             scene.meshes[i].currV.row(j) << scene.meshes[i].origV.row(j) + dataArray[index][i];
+
+            /*if (scene.meshes[i].density > 110 && scene.meshes[i].density < 112) {
+                RowVector3d normAng = {0,0.01,0};
+                RowVector4d q(0, normAng.x(), normAng.y(), normAng.z());
+                scene.meshes[i].orientation += 0.5 * timeStep*4 * QMult(q, scene.meshes[i].orientation);
+
+                scene.meshes[i].currV.row(j) << QRot(scene.meshes[i].origV.row(j), scene.meshes[i].orientation) + dataArray[index][i];
+            }*/
         }
+    }
+#pragma omp barrier
+
+    int bound;
+
+    if (withObject == true) {
+        bound = 5;
+    }
+    else {
+        bound = 4;
     }
 
     viewer.core().align_camera_center(scene.meshes[0].currV);
@@ -305,7 +386,13 @@ void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
         viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
         viewer.data_list[i].set_mesh(scene.meshes[i].currV, scene.meshes[i].F);
         viewer.data_list[i].set_face_based(true);
-        viewer.data_list[i].set_colors(meshColor);
+
+        if (i > bound) {
+            viewer.data_list[i].set_colors(bluemeshColor);
+        }
+        else {
+            viewer.data_list[i].set_colors(meshColor);
+        }
         viewer.data_list[i].show_lines = false;
     }
     viewer.data_list[0].show_lines = false;
@@ -327,12 +414,19 @@ void updateMeshesOffline(igl::opengl::glfw::Viewer& viewer)
     viewer.data_list[3].show_lines = false;
     viewer.data_list[3].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
     viewer.data_list[3].set_face_based(true);
-    viewer.data_list[3].set_visible(platVisibility);
+    viewer.data_list[3].set_visible(false);
 
     viewer.data_list[4].show_lines = false;
-    viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[3].F.rows(), 1));
+    viewer.data_list[4].set_colors(platColor.replicate(scene.meshes[4].F.rows(), 1));
     viewer.data_list[4].set_face_based(true);
     viewer.data_list[4].set_visible(false);
+
+    if (withObject == true) {
+        viewer.data_list[5].show_lines = false;
+        viewer.data_list[5].set_colors(meshColor);
+        viewer.data_list[5].set_face_based(true);
+        viewer.data_list[5].set_visible(true);
+    }
     //viewer.core.align_camera_center(scene.meshes[0].currV);
 
     //updating constraint viewing
@@ -405,11 +499,12 @@ bool pre_draw(igl::opengl::glfw::Viewer &viewer)
   }
   else {
       if (viewer.core().is_animating) {
-          if (currTime / timeStep >= frameNum-2) {
+          if ( currTime / timeStep >= frameNum-6) {
               currTime = 0;
           }
           else {
               currTime += timeStep;
+              //currTime += 4 * timeStep;
               //cout << currTime << endl;
           }
           //cout <<"currTime: "<<currTime<<endl;
@@ -463,6 +558,9 @@ int main(int argc, char *argv[])
   scene.addMesh(platV2, platF2, platT2, 10000.0, true, platCOM2, platOrientation2);
   scene.addMesh(platV3, platF3, platT3, 10000.0, true, platCOM3, platOrientation3);
   scene.addMesh(platV4, platF4, platT4, 10000.0, true, platCOM4, platOrientation4);
+
+  if(withObject == true)
+    scene.addMesh(platV5, platF5, platT5, 111.0, true, platCOM5, platOrientation5);
   
   //load scene from file
   scene.loadScene(std::string(argv[1]),std::string(argv[2]),std::string(argv[3]), strecth);
